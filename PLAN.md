@@ -73,6 +73,8 @@ Principes :
 
 ```
 content/
+├── skills.yaml             # arbre de compétences : nœuds, prérequis, problèmes
+│                           #   rattachés, positions (cf. Phase 1.5)
 ├── problems/
 │   └── deux-sommes/
 │       ├── problem.yaml        # titre, difficulté, tags, limites temps/mémoire
@@ -164,14 +166,26 @@ Décision du 2026-06-12. Principes :
   maîtrisé quand N des M problèmes sont résolus — calculé depuis les soumissions
   existantes.
 
-- [ ] Format `skills.yaml` dans le dépôt de contenu : nœuds, prérequis, problèmes
+- [x] Format `skills.yaml` dans le dépôt de contenu : nœuds, prérequis, problèmes
       rattachés, positions (fixées à la main). Validation à l'import : DAG, slugs existants.
-- [ ] API : graphe + état des nœuds pour l'utilisateur courant.
-- [ ] Rendu front : SVG custom ou react-flow, layout radial autour d'un nœud central.
-- [ ] Liens des nœuds vers les articles de cours correspondants (anticipe la Phase 3).
+      *(Seuil de maîtrise par nœud : clé `mastery`, défaut ~2/3 des problèmes ;
+      synchronisé par `clubjudge-content import` après les problèmes.)*
+- [x] API : graphe + état des nœuds pour l'utilisateur courant. *(`GET /api/skills/tree` :
+      maîtrisé / recommandé (tous les prérequis maîtrisés) / pas encore prêt — purement
+      visuel, rien n'est verrouillé.)*
+- [x] Rendu front : SVG custom ou react-flow, layout radial autour d'un nœud central.
+      *(SVG custom : hexagones crantés, maîtrisé en lavande pleine, recommandé en contour
+      lavande, pas prêt en pointillés ; panneau latéral avec problèmes et prérequis ;
+      l'arbre est l'accueil de la section, la liste reste en `/problems/list`. Le nœud
+      recommandé est pré-sélectionné à l'arrivée — la réponse à « je travaille quoi ? ».)*
+- [ ] Liens des nœuds vers les articles de cours correspondants (en attente de la
+      Phase 3 — il n'y a pas encore d'articles à lier).
 - ⚠️ **Chemin critique éditorial, pas technique** : découper le programme du club
   en compétences et prérequis sensés — à faire collectivement au club.
+  *(L'arbre actuel — 4 nœuds, 5 problèmes — est un brouillon d'amorçage marqué
+  comme tel dans `skills.yaml`.)*
 - 🎯 **Jalon : un nouveau membre sait quoi travailler ensuite sans demander.**
+  ✓ mécanique en place (2026-06-12) — reste le vrai découpage collectif.
 
 ### Phase 2 — Compétitions (ICPC)
 *Objectif : le club peut organiser un contest interne.*

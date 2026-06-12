@@ -46,6 +46,30 @@ export interface SharedSolution {
   source_code: string;
 }
 
+export type SkillState = 'mastered' | 'recommended' | 'not_ready';
+
+export interface SkillProblemRef {
+  slug: string;
+  title: string;
+  difficulty: number;
+  solved: boolean;
+}
+
+export interface SkillNode {
+  slug: string;
+  name_fr: string;
+  name_en: string | null;
+  description_fr: string | null;
+  description_en: string | null;
+  x: number;
+  y: number;
+  requires: string[];
+  problems: SkillProblemRef[];
+  solved_count: number;
+  mastery_threshold: number;
+  state: SkillState;
+}
+
 export type SubmissionLanguage = 'cpp' | 'python' | 'c' | 'java';
 
 export type Verdict = 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' | 'IE';
@@ -140,6 +164,7 @@ export const api = {
     return request<ProblemSummary[]>(`/api/problems${qs ? `?${qs}` : ''}`);
   },
   categories: () => request<string[]>('/api/problems/categories'),
+  skillTree: () => request<SkillNode[]>('/api/skills/tree'),
   problem: (slug: string) => request<ProblemDetail>(`/api/problems/${slug}`),
 
   submit: (slug: string, language: SubmissionLanguage, sourceCode: string) =>

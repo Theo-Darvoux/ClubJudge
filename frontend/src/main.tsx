@@ -8,6 +8,7 @@ import { I18nProvider } from './i18n';
 import { AuthPage } from './pages/AuthPage';
 import { ProblemPage } from './pages/ProblemPage';
 import { ProblemsPage } from './pages/ProblemsPage';
+import { SkillTreePage } from './pages/SkillTreePage';
 import './styles/global.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -24,7 +25,8 @@ createRoot(document.getElementById('root')!).render(
                 </RequireAuth>
               }
             >
-              <Route path="/problems" element={<ProblemsPage />} />
+              <Route path="/problems" element={<SkillTreePage />} />
+              <Route path="/problems/list" element={<ProblemsPage />} />
               <Route path="/problems/:slug" element={<ProblemPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/problems" replace />} />

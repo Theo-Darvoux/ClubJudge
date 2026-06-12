@@ -1,0 +1,12 @@
+# Indices progressifs : du plus vague au plus précis, un par élément.
+- >-
+  Comparer toutes les paires coûte $O(n^2)$ : environ $5 \times 10^9$
+  comparaisons pour $n = 10^5$, beaucoup trop. Il faut éviter de regarder
+  chaque paire.
+- >-
+  Que deviennent les deux valeurs les plus proches une fois le tableau trié ?
+  Elles se retrouvent forcément côte à côte.
+- >-
+  Triez, puis ne comparez que les voisins : la réponse est le minimum de
+  $v_{i+1} - v_i$ sur le tableau trié. Coût total : $O(n \log n)$ pour le
+  tri, $O(n)$ pour le parcours.

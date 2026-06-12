@@ -49,6 +49,27 @@ export const fr = {
     empty: 'Aucun problème ne correspond à ces filtres.',
     loading: 'chargement…',
   },
+  skills: {
+    title: 'Problèmes',
+    overline: 'Arbre de compétences',
+    view_tree: 'Arbre',
+    view_list: 'Liste',
+    state: {
+      mastered: 'Maîtrisé',
+      recommended: 'Recommandé',
+      not_ready: 'Pas encore prêt',
+    },
+    soft_unlock: "Rien n'est verrouillé — l'arbre recommande, vous choisissez.",
+    panel_hint: 'Cliquez sur un nœud pour voir ses problèmes.',
+    mastery_progress: (n: number, m: number) =>
+      `${n} résolu${n > 1 ? 's' : ''} sur ${m} pour maîtriser`,
+    prerequisites: 'Prérequis',
+    node_problems: 'Problèmes du nœud',
+    empty:
+      "L'arbre de compétences n'est pas encore défini (content/skills.yaml). " +
+      'La liste des problèmes reste disponible.',
+    loading: 'chargement…',
+  },
   difficulty: {
     1: 'Échauffement',
     2: 'Facile',

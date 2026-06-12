@@ -1,0 +1,11 @@
+# Indices progressifs : du plus vague au plus précis, un par élément.
+- >-
+  Commencez par découper la ligne en mots : `input().split()` en Python,
+  `std::cin >> mot` dans une boucle en C++.
+- >-
+  Parcourez les mots en gardant en mémoire « le plus long vu jusqu'ici ».
+  Attention à l'égalité : pour garder le **premier** des plus longs, ne
+  remplacez le champion que si le nouveau mot est **strictement** plus long.
+- >-
+  En Python, `max(mots, key=len)` fait exactement ça : il renvoie le premier
+  élément de longueur maximale.

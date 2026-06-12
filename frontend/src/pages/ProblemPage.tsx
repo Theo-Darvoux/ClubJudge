@@ -155,7 +155,7 @@ function ProblemView({ slug }: { slug: string }) {
   if (notFound) {
     return (
       <p className="empty-state">
-        404 — <Link to="/problems">{t.problem.back}</Link>
+        404 — <Link to="/problems/list">{t.problem.back}</Link>
       </p>
     );
   }
@@ -169,7 +169,7 @@ function ProblemView({ slug }: { slug: string }) {
   return (
     <div className="problem-page">
       <nav className="breadcrumb">
-        <Link to="/problems">{t.problem.back}</Link>
+        <Link to="/problems/list">{t.problem.back}</Link>
       </nav>
 
       <header className="problem-head">

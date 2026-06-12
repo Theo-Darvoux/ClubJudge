@@ -11,8 +11,8 @@ import sys
 from pathlib import Path
 
 from app.config import get_settings
-from app.content.importer import import_problem_dir, validate_solutions
-from app.content.loader import ContentError, discover_problems, load_problem
+from app.content.importer import import_problem_dir, sync_skills, validate_solutions
+from app.content.loader import ContentError, discover_problems, load_problem, load_skills
 from app.db import SessionLocal
 from app.judge import Judge0Judge
 
@@ -40,6 +40,24 @@ async def _run(command: str, content_dir: Path) -> int:
 
     total = len(problem_dirs)
     print(f"\n{total - failures}/{total} problème(s) valide(s)")
+
+    # L'arbre de compétences (optionnel) se valide après les problèmes : ses
+    # nœuds référencent leurs slugs.
+    try:
+        skills = load_skills(content_dir, {p.name for p in problem_dirs})
+        if skills:
+            if command == "import":
+                if failures:
+                    print("skills.yaml : import sauté (des problèmes ont échoué)",
+                          file=sys.stderr)
+                    return 1
+                with SessionLocal() as db:
+                    sync_skills(db, skills)
+            print(f"  OK  skills.yaml ({len(skills)} nœud(s))")
+    except ContentError as exc:
+        failures += 1
+        print(f"ÉCHEC skills.yaml\n      {exc}", file=sys.stderr)
+
     return 1 if failures else 0
 
 

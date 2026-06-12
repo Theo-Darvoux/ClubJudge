@@ -1,0 +1,55 @@
+# Arbre de compétences de la section Problèmes (PLAN.md §Phase 1.5).
+#
+# ⚠ BROUILLON d'amorçage : le vrai découpage du programme du club en
+# compétences et prérequis se décide collectivement en séance. Cet arbre
+# montre la mécanique avec les problèmes déjà disponibles.
+#
+# Champs d'un nœud :
+#   id          slug unique
+#   name        nom affiché (français) ; name_en optionnel
+#   description une ou deux phrases pour le panneau latéral (optionnel)
+#   position    [x, y] fixée à la main — unités libres, y vers le bas,
+#               le nœud racine au centre (layout radial)
+#   requires    ids des compétences prérequises (DAG vérifié à l'import)
+#   problems    slugs des problèmes rattachés (3 à 5 idéalement)
+#   mastery     nb d'AC pour maîtriser le nœud (défaut : ~2/3 des problèmes)
+
+skills:
+  - id: premiers-pas
+    name: Premiers pas
+    name_en: First steps
+    description: >-
+      Lire l'entrée, écrire la sortie : le rituel de base de tout problème.
+      Tout part d'ici.
+    position: [0, 0]
+    problems: [deux-sommes]
+
+  - id: chaines
+    name: Chaînes de caractères
+    name_en: Strings
+    description: >-
+      Découper, parcourir et comparer du texte — et garder le meilleur
+      candidat en chemin.
+    requires: [premiers-pas]
+    position: [-170, -95]
+    problems: [le-mot-le-plus-long]
+
+  - id: tableaux-et-tri
+    name: Tableaux et tri
+    name_en: Arrays and sorting
+    description: >-
+      Le tri de la bibliothèque standard, ce qu'il coûte, et ce qu'il rend
+      possible : un tableau trié répond à beaucoup de questions.
+    requires: [premiers-pas]
+    position: [170, -95]
+    problems: [tri-de-dossards, binomes-de-niveau]
+
+  - id: programmation-dynamique
+    name: Programmation dynamique
+    name_en: Dynamic programming
+    description: >-
+      Construire la réponse pas à pas à partir des sous-problèmes — ici la
+      version la plus célèbre : Kadane.
+    requires: [tableaux-et-tri]
+    position: [340, -190]
+    problems: [la-meilleure-semaine]

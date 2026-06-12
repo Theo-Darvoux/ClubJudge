@@ -1108,3 +1108,267 @@ select {
 .run-stderr pre {
   color: var(--verdict-wa);
 }
+
+/* ---- Arbre de compétences ---------------------------------------------- */
+
+.page-head-titles {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.view-toggle {
+  display: inline-flex;
+  gap: 1px;
+  background: var(--line);
+  padding: 1px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--notch-sm)) 0,
+    100% var(--notch-sm),
+    100% 100%,
+    var(--notch-sm) 100%,
+    0 calc(100% - var(--notch-sm))
+  );
+}
+
+.view-toggle-btn {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--ink-soft);
+  background: var(--bg-raised);
+  padding: 0.45rem 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: background 0.3s var(--ease-out), color 0.3s var(--ease-out);
+}
+
+.view-toggle-btn:hover {
+  color: var(--ink);
+  background: var(--lav-08);
+}
+
+.view-toggle-btn.active {
+  color: var(--bg);
+  background: var(--lav);
+}
+
+.skilltree-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(17rem, 24rem);
+  gap: 1.2rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .skilltree-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.skilltree-canvas .panel-inner {
+  padding: clamp(0.8rem, 2vw, 1.4rem);
+}
+
+.skilltree-canvas svg {
+  width: 100%;
+  height: auto;
+}
+
+.skill-edge {
+  stroke: var(--line);
+  stroke-width: 2;
+}
+
+.skill-edge.is-lit {
+  stroke: var(--lav-25);
+}
+
+.skill-node {
+  cursor: pointer;
+  outline: none;
+}
+
+.skill-hex {
+  fill: var(--bg-raised);
+  stroke: var(--line);
+  stroke-width: 1.5;
+  transition: fill 0.3s var(--ease-out), stroke 0.3s var(--ease-out);
+}
+
+.skill-progress {
+  fill: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+}
+
+.skill-name {
+  fill: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: 15px;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+/* Maîtrisé : lavande pleine — la récompense visuelle. */
+.skill-node.is-mastered .skill-hex {
+  fill: var(--lav);
+  stroke: var(--lav);
+}
+
+.skill-node.is-mastered .skill-progress {
+  fill: var(--bg);
+  font-weight: 700;
+}
+
+.skill-node.is-mastered .skill-name {
+  fill: var(--ink);
+}
+
+/* Recommandé : contour lavande, c'est « la prochaine étape ». */
+.skill-node.is-recommended .skill-hex {
+  fill: var(--lav-08);
+  stroke: var(--lav);
+  stroke-width: 2;
+}
+
+.skill-node.is-recommended .skill-progress {
+  fill: var(--lav);
+}
+
+.skill-node.is-recommended .skill-name {
+  fill: var(--ink);
+}
+
+/* Pas encore prêt : éteint mais cliquable (déblocage souple). */
+.skill-node.is-not_ready .skill-hex {
+  stroke-dasharray: 5 4;
+}
+
+.skill-node:hover .skill-hex,
+.skill-node:focus-visible .skill-hex {
+  stroke: var(--lav);
+}
+
+.skill-node.is-selected .skill-hex {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.skill-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.4rem;
+  align-items: center;
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.skill-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-hex {
+  width: 12px;
+  height: 12px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+}
+
+.legend-hex.is-mastered {
+  background: var(--lav);
+}
+
+.legend-hex.is-recommended {
+  background: var(--lav-08);
+  box-shadow: inset 0 0 0 1.5px var(--lav);
+}
+
+.legend-note {
+  color: var(--ink-dim);
+  margin-left: auto;
+}
+
+.skill-panel .panel-inner {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.skill-state-label.is-mastered {
+  color: var(--verdict-ac);
+}
+
+.skill-state-label.is-recommended {
+  color: var(--lav);
+}
+
+.skill-state-label.is-not_ready {
+  color: var(--ink-dim);
+}
+
+.skill-description {
+  color: var(--ink-soft);
+}
+
+.skill-mastery {
+  color: var(--ink-dim);
+}
+
+.skill-problems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.skill-problems li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.skill-problems .problem-link {
+  margin-right: auto;
+}
+
+.skill-prereqs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 0.9rem;
+}
+
+.skill-prereq-chip {
+  border: 0;
+  cursor: pointer;
+}
+
+.skill-prereq-chip:hover {
+  background: var(--lav-14);
+  color: var(--ink);
+}
+
+.skill-prereq-chip.is-mastered {
+  color: var(--verdict-ac);
+}
+
+/* Dans le panneau, les pastilles suffisent (le libellé reste en title). */
+.skill-problems .difficulty-label {
+  display: none;
+}

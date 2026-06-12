@@ -51,6 +51,26 @@ export const en: typeof fr = {
     empty: 'No problem matches these filters.',
     loading: 'loading…',
   },
+  skills: {
+    title: 'Problems',
+    overline: 'Skill tree',
+    view_tree: 'Tree',
+    view_list: 'List',
+    state: {
+      mastered: 'Mastered',
+      recommended: 'Recommended',
+      not_ready: 'Not ready yet',
+    },
+    soft_unlock: 'Nothing is locked — the tree recommends, you choose.',
+    panel_hint: 'Click a node to see its problems.',
+    mastery_progress: (n: number, m: number) => `${n} solved out of ${m} to master`,
+    prerequisites: 'Prerequisites',
+    node_problems: 'Node problems',
+    empty:
+      'The skill tree is not defined yet (content/skills.yaml). ' +
+      'The problem list is still available.',
+    loading: 'loading…',
+  },
   difficulty: {
     1: 'Warm-up',
     2: 'Easy',

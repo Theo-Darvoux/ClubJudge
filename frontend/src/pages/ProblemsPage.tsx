@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api';
 import type { ProblemSummary } from '../api';
 import { DifficultyDots, StatusMark } from '../components/badges';
+import { ViewToggle } from '../components/ViewToggle';
 import { useI18n } from '../i18n/context';
 
 export function ProblemsPage() {
@@ -44,12 +45,15 @@ export function ProblemsPage() {
   return (
     <div className="problems-page">
       <header className="page-head">
-        <h1>{t.problems.title}</h1>
-        {visible && (
-          <span className="mono-label">
-            {visible.length} {visible.length > 1 ? t.problems.count_many : t.problems.count_one}
-          </span>
-        )}
+        <div className="page-head-titles">
+          <h1>{t.problems.title}</h1>
+          {visible && (
+            <span className="mono-label">
+              {visible.length} {visible.length > 1 ? t.problems.count_many : t.problems.count_one}
+            </span>
+          )}
+        </div>
+        <ViewToggle />
       </header>
 
       <div className="filters">

@@ -120,6 +120,60 @@ class ProblemHint(Base):
     problem: Mapped[Problem] = relationship(back_populates="hints")
 
 
+class Skill(Base):
+    """Nœud de l'arbre de compétences (content/skills.yaml), synchronisé à
+    l'import. Positions fixées à la main par l'auteur de l'arbre."""
+
+    __tablename__ = "skills"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    name_fr: Mapped[str] = mapped_column(String(64))
+    name_en: Mapped[str | None] = mapped_column(String(64), default=None)
+    description_fr: Mapped[str | None] = mapped_column(Text, default=None)
+    description_en: Mapped[str | None] = mapped_column(Text, default=None)
+    x: Mapped[float] = mapped_column()
+    y: Mapped[float] = mapped_column()
+    # Nb de problèmes du nœud à résoudre pour le considérer maîtrisé.
+    mastery_threshold: Mapped[int] = mapped_column(Integer)
+
+    prerequisites: Mapped[list["SkillPrerequisite"]] = relationship(
+        back_populates="skill",
+        cascade="all, delete-orphan",
+        foreign_keys="SkillPrerequisite.skill_id",
+    )
+    problems: Mapped[list["SkillProblem"]] = relationship(
+        back_populates="skill", cascade="all, delete-orphan", order_by="SkillProblem.position"
+    )
+
+
+class SkillPrerequisite(Base):
+    __tablename__ = "skill_prerequisites"
+    __table_args__ = (UniqueConstraint("skill_id", "prerequisite_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    skill_id: Mapped[int] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
+    prerequisite_id: Mapped[int] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
+
+    skill: Mapped[Skill] = relationship(
+        back_populates="prerequisites", foreign_keys=[skill_id]
+    )
+    prerequisite: Mapped[Skill] = relationship(foreign_keys=[prerequisite_id])
+
+
+class SkillProblem(Base):
+    __tablename__ = "skill_problems"
+    __table_args__ = (UniqueConstraint("skill_id", "problem_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    skill_id: Mapped[int] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
+    problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id", ondelete="CASCADE"))
+    position: Mapped[int] = mapped_column(Integer)
+
+    skill: Mapped[Skill] = relationship(back_populates="problems")
+    problem: Mapped[Problem] = relationship()
+
+
 class Submission(Base):
     __tablename__ = "submissions"
     __table_args__ = (Index("ix_submissions_user_problem", "user_id", "problem_id"),)

@@ -5,10 +5,18 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.content.loader import ContentError, LoadedProblem, load_problem
+from app.content.loader import ContentError, LoadedProblem, LoadedSkill, load_problem
 from app.judge.base import Judge
 from app.judge.types import Verdict
-from app.models import Problem, ProblemHint, ProblemTag, ProblemTest
+from app.models import (
+    Problem,
+    ProblemHint,
+    ProblemTag,
+    ProblemTest,
+    Skill,
+    SkillPrerequisite,
+    SkillProblem,
+)
 
 
 async def validate_solutions(problem: LoadedProblem, judge: Judge) -> None:
@@ -72,3 +80,48 @@ async def import_problem_dir(db: Session, judge: Judge, problem_dir: Path) -> Pr
     loaded = load_problem(problem_dir)
     await validate_solutions(loaded, judge)
     return upsert_problem(db, loaded)
+
+
+def sync_skills(db: Session, loaded: list[LoadedSkill]) -> list[Skill]:
+    """Remplace l'arbre de compétences par celui du dépôt de contenu. Aucune
+    donnée utilisateur n'est rattachée aux nœuds (la progression est calculée
+    depuis les soumissions), donc la resynchronisation totale est sans perte."""
+    problems = {p.slug: p for p in db.scalars(select(Problem))}
+    for skill_def in loaded:
+        missing = [s for s in skill_def.problems if s not in problems]
+        if missing:
+            raise ContentError(
+                Path("skills.yaml"),
+                f"nœud `{skill_def.id}` : problème(s) absent(s) de la base "
+                f"(importez les problèmes d'abord) : {missing}",
+            )
+
+    for skill in db.scalars(select(Skill)):
+        db.delete(skill)
+    db.flush()
+
+    skills: dict[str, Skill] = {}
+    for skill_def in loaded:
+        skill = Skill(
+            slug=skill_def.id,
+            name_fr=skill_def.name_fr,
+            name_en=skill_def.name_en,
+            description_fr=skill_def.description_fr,
+            description_en=skill_def.description_en,
+            x=skill_def.x,
+            y=skill_def.y,
+            mastery_threshold=skill_def.mastery,
+            problems=[
+                SkillProblem(problem_id=problems[slug].id, position=i + 1)
+                for i, slug in enumerate(skill_def.problems)
+            ],
+        )
+        db.add(skill)
+        skills[skill_def.id] = skill
+    db.flush()
+    for skill_def in loaded:
+        skills[skill_def.id].prerequisites = [
+            SkillPrerequisite(prerequisite_id=skills[req].id) for req in skill_def.requires
+        ]
+    db.commit()
+    return list(skills.values())
