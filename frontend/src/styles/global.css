@@ -1,0 +1,146 @@
+@import './tokens.css';
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--lav);
+  color: var(--bg);
+}
+
+a {
+  color: inherit;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font: inherit;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--lav);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.container {
+  width: min(var(--container), 100% - 3rem);
+  margin-inline: auto;
+}
+
+.accent {
+  color: var(--lav);
+}
+
+/* Panneau cranté — la signature visuelle (bordure 1px via padding + clip-path) */
+.panel {
+  --p-line: var(--line);
+  --p-bg: var(--bg-raised);
+  position: relative;
+  padding: 1px;
+  background: var(--p-line);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--notch)) 0,
+    100% var(--notch),
+    100% 100%,
+    var(--notch) 100%,
+    0 calc(100% - var(--notch))
+  );
+}
+
+.panel-inner {
+  background: var(--p-bg);
+  clip-path: inherit;
+  height: 100%;
+  padding: clamp(1.5rem, 3vw, 2.2rem);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 0.98rem;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0.85rem 1.7rem;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--notch-sm)) 0,
+    100% var(--notch-sm),
+    100% 100%,
+    var(--notch-sm) 100%,
+    0 calc(100% - var(--notch-sm))
+  );
+  transition: background 0.3s var(--ease-out), color 0.3s var(--ease-out);
+}
+
+.btn-primary {
+  background: var(--lav);
+  color: #150f22;
+}
+
+.btn-primary:hover {
+  background: #eed9ff;
+}
+
+.btn-ghost {
+  background: var(--lav-08);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--lav-14);
+}
+
+.btn-ghost:hover {
+  background: var(--lav-14);
+}
+
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--lav-soft);
+}

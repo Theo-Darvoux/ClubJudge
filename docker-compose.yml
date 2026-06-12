@@ -1,0 +1,101 @@
+# Dév : `docker compose up -d` lance PostgreSQL + Judge0 ; backend et frontend
+# tournent sur l'hôte (cf. README). Prod : `docker compose --profile full up -d`
+# conteneurise aussi backend et frontend (reverse proxy TLS à ajouter sur le serveur).
+#
+# SÉCURITÉ : Judge0 exécute du code arbitraire. Il vit sur le réseau interne
+# `judge0` et n'est publié que sur 127.0.0.1 pour le dév local — ne JAMAIS
+# publier ce port sur une interface publique en production.
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-clubjudge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clubjudge}
+      POSTGRES_DB: ${POSTGRES_DB:-clubjudge}
+    ports:
+      - "127.0.0.1:5433:5432" # 5433 côté hôte : 5432 est souvent déjà pris
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # --- Judge0 (moteur de juge) -------------------------------------------
+  # Les workers ont besoin de privilèges pour isolate (cgroups). Si le serveur
+  # cible est en cgroup v2 pur, Judge0 1.13.1 demande le paramètre noyau
+  # systemd.unified_cgroup_hierarchy=0 — à vérifier au déploiement (PLAN.md §7).
+
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    env_file: judge0/judge0.conf
+    ports:
+      - "127.0.0.1:2358:2358" # dév local uniquement
+    privileged: true
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    networks:
+      - judge0
+
+  judge0-workers:
+    image: judge0/judge0:1.13.1
+    command: ["./scripts/workers"]
+    env_file: judge0/judge0.conf
+    privileged: true
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    networks:
+      - judge0
+
+  judge0-db:
+    image: postgres:16-alpine
+    env_file: judge0/judge0.conf
+    volumes:
+      - judge0-pgdata:/var/lib/postgresql/data
+    networks:
+      - judge0
+
+  judge0-redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "judge0-internal"]
+    networks:
+      - judge0
+
+  # --- Application (profil `full`, pour la prod) -------------------------
+
+  backend:
+    profiles: [full]
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-clubjudge}:${POSTGRES_PASSWORD:-clubjudge}@db:5432/${POSTGRES_DB:-clubjudge}
+      JUDGE0_URL: http://judge0-server:2358
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      judge0-server:
+        condition: service_started
+    networks:
+      - default
+      - judge0
+
+  frontend:
+    profiles: [full]
+    build: ./frontend
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on:
+      - backend
+
+networks:
+  judge0:
+    internal: false # passer à `true` en prod si les images n'ont pas besoin d'Internet
+
+volumes:
+  pgdata:
+  judge0-pgdata:

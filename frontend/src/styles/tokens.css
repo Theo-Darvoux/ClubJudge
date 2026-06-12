@@ -1,0 +1,70 @@
+/* Design tokens du Club Code — extraits de clubcode.fr (src/styles/global.css).
+   Source de vérité partagée entre le site vitrine et ClubJudge : toute évolution
+   de l'identité visuelle se fait ici et se reporte là-bas (PLAN.md §6). */
+
+@font-face {
+  font-family: 'Clash Display';
+  src: url('/fonts/clash-display-500.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Clash Display';
+  src: url('/fonts/clash-display-600.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/satoshi-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/satoshi-500.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/satoshi-700.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --bg: #08080d;
+  --bg-raised: #0d0d15;
+  --bg-overlay: rgba(13, 13, 21, 0.72);
+  --ink: #f4f2fa;
+  --ink-soft: #b8b4c7;
+  --ink-dim: #807c92;
+  --lav: #dcb7ff;
+  --lav-soft: rgba(220, 183, 255, 0.62);
+  --lav-08: rgba(220, 183, 255, 0.08);
+  --lav-14: rgba(220, 183, 255, 0.14);
+  --lav-25: rgba(220, 183, 255, 0.25);
+  --line: rgba(220, 183, 255, 0.13);
+  --line-soft: rgba(244, 242, 250, 0.07);
+
+  --font-display: 'Clash Display', sans-serif;
+  --font-body: 'Satoshi', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Menlo, monospace;
+
+  --notch: 16px;
+  --notch-sm: 10px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --container: 1180px;
+
+  /* Palette sémantique des verdicts (propre à ClubJudge, PLAN.md §6) */
+  --verdict-ac: #7fe0a7;
+  --verdict-wa: #ff8b9e;
+  --verdict-tle: #ffd27f;
+  --verdict-re: #ffab7f;
+  --verdict-ce: #807c92;
+}
