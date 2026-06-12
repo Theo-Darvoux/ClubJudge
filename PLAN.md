@@ -131,20 +131,20 @@ l'utilisable arrive vite. Résister à l'envie d'y glisser le reste du catalogue
 #### Phase 1a — Le strict minimum utilisable en séance
 *Objectif : un membre se connecte, choisit un problème, soumet, voit son verdict.*
 
-- [ ] Auth : inscription/connexion email + mot de passe (hash argon2/bcrypt, sessions cookie HttpOnly/SameSite), rôles `member`/`admin`.
-- [ ] Vérification d'email et reset de mot de passe (dépend du SMTP validé en Phase 0).
-- [ ] Modèle et import des problèmes depuis le dépôt de contenu (validation du format, génération des tests, exécution des solutions de référence contre les tests) — même code que la CLI auteur (§3).
-- [ ] Liste des problèmes : filtres par catégorie, difficulté, thème ; recherche.
-- [ ] Page problème : énoncé (Markdown + LaTeX), limites, soumission de code (éditeur Monaco), historique de ses soumissions.
-- [ ] Pipeline de soumission : **soumissions persistées en base avant tout envoi au juge** (rejouables si Judge0 tombe), file avec retry, envoi à Judge0, verdicts détaillés (AC/WA/TLE/MLE/RE/CE), feedback en quasi-temps réel (polling d'abord, WebSocket/SSE plus tard).
-- [ ] Rate limiting des soumissions (par utilisateur et global) — protège la file et la machine.
-- [ ] Statut "résolu" par utilisateur, visible dans la liste.
+- [x] Auth : inscription/connexion email + mot de passe (hash argon2, sessions cookie HttpOnly/SameSite), rôles `member`/`admin`.
+- [ ] Vérification d'email et reset de mot de passe (dépend du SMTP validé en Phase 0 — en attente du déploiement).
+- [x] Modèle et import des problèmes depuis le dépôt de contenu (validation du format, exécution des solutions de référence contre les tests) — même code que la CLI auteur (`clubjudge-content validate|import`). 3 problèmes d'amorçage dans `content/problems/`.
+- [x] Liste des problèmes : filtres par catégorie, difficulté ; recherche (titre + tags).
+- [x] Page problème : énoncé (Markdown + LaTeX), limites, soumission de code (éditeur Monaco), historique de ses soumissions.
+- [x] Pipeline de soumission : **soumissions persistées en base avant tout envoi au juge** (re-enfilées au redémarrage), file avec retry à backoff, verdicts détaillés (AC/WA/TLE/MLE/RE/CE + 1er test échoué + sortie compilateur), feedback en quasi-temps réel (polling 1 s).
+- [x] Rate limiting des soumissions (cooldown 10 s par utilisateur, compte à rebours sur le bouton).
+- [x] Statut "résolu" par utilisateur, visible dans la liste (✓ vert) et sur la page problème (badge).
 - 🎯 **Jalon : une séance du club peut se tenir entièrement sur la plateforme.**
 
 #### Phase 1b — Le confort pédagogique
 *Objectif : la plateforme aide à apprendre, pas seulement à juger.*
 
-- [ ] Éditeur : sauvegarde auto du code (localStorage par problème/langage), templates de départ par langage.
+- [x] Éditeur : sauvegarde auto du code (localStorage par problème/langage), templates de départ par langage. *(Fait en avance, en Phase 1a.)*
 - [ ] Bouton « Exécuter sur les exemples » + entrée custom — ne compte pas comme soumission, lève la peur de soumettre.
 - [ ] Indices progressifs (dépliables un à un, avec confirmation) et éditorial de l'auteur, depuis le dépôt de contenu.
 - [ ] Solutions des autres membres visibles après son propre AC (filtre par langage, tri par temps/mémoire).

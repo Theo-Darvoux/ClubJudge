@@ -1,12 +1,27 @@
+from contextlib import asynccontextmanager
+
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from app import auth, problems, submissions
 from app.config import get_settings
 from app.db import engine
+from app.judge import Judge0Judge
+from app.judging import JudgeWorker
 
-app = FastAPI(title="ClubJudge API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    worker = JudgeWorker(Judge0Judge(get_settings().judge0_url))
+    app.state.judge_worker = worker
+    await worker.start()
+    yield
+    await worker.stop()
+
+
+app = FastAPI(title="ClubJudge API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,6 +30,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router)
+app.include_router(problems.router)
+app.include_router(submissions.router)
 
 
 @app.get("/api/health")
@@ -39,4 +58,8 @@ async def health_deep() -> dict:
     except httpx.HTTPError:
         judge0 = "down"
 
-    return {"database": database, "judge0": judge0}
+    return {
+        "database": database,
+        "judge0": judge0,
+        "judge_queue_length": app.state.judge_worker.queue_length,
+    }

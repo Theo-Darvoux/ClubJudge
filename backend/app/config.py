@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://clubjudge:clubjudge@localhost:5433/clubjudge"
     judge0_url: str = "http://localhost:2358"
     cors_origins: list[str] = ["http://localhost:5173"]
+    secure_cookies: bool = False  # passer à True derrière TLS en prod
+    content_dir: str = "../content"
+    # Intervalle minimal entre deux soumissions d'un même utilisateur.
+    submission_cooldown_s: int = 10
 
 
 @lru_cache

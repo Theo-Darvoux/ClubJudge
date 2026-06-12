@@ -1,13 +1,36 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from './auth/AuthProvider';
+import { Layout } from './components/Layout';
+import { RequireAuth } from './components/RequireAuth';
 import { I18nProvider } from './i18n';
+import { AuthPage } from './pages/AuthPage';
+import { ProblemPage } from './pages/ProblemPage';
+import { ProblemsPage } from './pages/ProblemsPage';
 import './styles/global.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <I18nProvider>
-      <App />
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<AuthPage />} />
+            <Route
+              element={
+                <RequireAuth>
+                  <Layout />
+                </RequireAuth>
+              }
+            >
+              <Route path="/problems" element={<ProblemsPage />} />
+              <Route path="/problems/:slug" element={<ProblemPage />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/problems" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </I18nProvider>
   </StrictMode>,
 );

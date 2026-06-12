@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import UTC, datetime
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -17,3 +18,9 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 def get_db() -> Generator[Session]:
     with SessionLocal() as session:
         yield session
+
+
+def as_utc(dt: datetime) -> datetime:
+    """Les colonnes DateTime(timezone=True) reviennent naïves depuis SQLite
+    (tests) ; on les considère UTC pour comparer avec datetime.now(UTC)."""
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
