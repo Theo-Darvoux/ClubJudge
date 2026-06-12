@@ -80,8 +80,9 @@ content/
 │       ├── editorial.fr.md     # solution rédigée par l'auteur (visible après AC)
 │       ├── hints.yaml          # indices progressifs (1, 2, ...) rédigés par l'auteur
 │       ├── tests/
-│       │   ├── 01.in / 01.out
-│       │   └── ...
+│       │   ├── sample1.in / sample1.out  # exemples de l'énoncé (publics, ≥1 requis,
+│       │   ├── 01.in / 01.out            #   exécutables sans soumettre) ; le reste
+│       │   └── ...                       #   est secret
 │       ├── generator.py        # optionnel : génère les gros tests (commiter le
 │       ├── validator.py        #   générateur, jamais 50 Mo de .in dans Git)
 │       └── solutions/          # solutions de référence (validation des tests)
@@ -145,10 +146,10 @@ l'utilisable arrive vite. Résister à l'envie d'y glisser le reste du catalogue
 *Objectif : la plateforme aide à apprendre, pas seulement à juger.*
 
 - [x] Éditeur : sauvegarde auto du code (localStorage par problème/langage), templates de départ par langage. *(Fait en avance, en Phase 1a.)*
-- [ ] Bouton « Exécuter sur les exemples » + entrée custom — ne compte pas comme soumission, lève la peur de soumettre.
-- [ ] Indices progressifs (dépliables un à un, avec confirmation) et éditorial de l'auteur, depuis le dépôt de contenu.
-- [ ] Solutions des autres membres visibles après son propre AC (filtre par langage, tri par temps/mémoire).
-- 🎯 **Jalon : la plateforme remplace un usage type "france-ioi" pour les séances du club.**
+- [x] Bouton « Exécuter sur les exemples » + entrée custom — ne compte pas comme soumission, lève la peur de soumettre. *(Tests `sample*.in` publics, exécutés via `judge.run()` sans sortie attendue ; comparaison côté API avec la tolérance Judge0 ; sortie obtenue/attendue affichées en cas d'échec ; cooldown léger de 3 s.)*
+- [x] Indices progressifs (dépliables un à un, avec confirmation) et éditorial de l'auteur, depuis le dépôt de contenu. *(`hints.yaml` + `editorial.fr.md` ; indices révélés un à un côté client (mémorisés par problème), éditorial servi uniquement après son propre AC.)*
+- [x] Solutions des autres membres visibles après son propre AC (filtre par langage, tri par temps/mémoire). *(Meilleure soumission par membre et par langage.)*
+- 🎯 **Jalon : la plateforme remplace un usage type "france-ioi" pour les séances du club.** ✓ (2026-06-12)
 
 ### Phase 1.5 — Arbre de compétences
 *Objectif : la section Problèmes s'ouvre sur un arbre de compétences façon talent tree, qui guide la progression.*

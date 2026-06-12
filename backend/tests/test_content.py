@@ -19,11 +19,13 @@ def write_valid_problem(root: Path) -> Path:
         "title: Somme\ncategory: bases\ndifficulty: 1\ntags: [io]\n"
     )
     (d / "statement.fr.md").write_text("Énoncé.")
-    (d / "tests" / "01.in").write_text("2 3\n")
-    (d / "tests" / "01.out").write_text("5\n")
+    (d / "tests" / "sample1.in").write_text("2 3\n")
+    (d / "tests" / "sample1.out").write_text("5\n")
     (d / "tests" / "02.in").write_text("1 1\n")
     (d / "tests" / "02.out").write_text("2\n")
     (d / "solutions" / "solution.py").write_text("a,b=map(int,input().split());print(a+b)\n")
+    (d / "hints.yaml").write_text('- "Lisez deux entiers."\n- "Additionnez-les."\n')
+    (d / "editorial.fr.md").write_text("On additionne, tout simplement.\n")
     return d
 
 
@@ -32,6 +34,10 @@ def test_load_valid_problem(tmp_path):
     assert loaded.slug == "somme-test"
     assert loaded.difficulty == 1
     assert len(loaded.tests) == 2
+    assert loaded.sample_count == 1
+    assert loaded.tests[0].input == "2 3\n"  # l'exemple passe en premier
+    assert loaded.hints == ["Lisez deux entiers.", "Additionnez-les."]
+    assert loaded.editorial_fr is not None
     assert loaded.solutions[0].language == "python"
 
 
@@ -41,6 +47,14 @@ def test_load_valid_problem(tmp_path):
         (lambda d: (d / "problem.yaml").unlink(), "problem.yaml"),
         (lambda d: (d / "statement.fr.md").unlink(), "statement.fr.md"),
         (lambda d: (d / "tests" / "02.in").unlink(), "tests"),
+        (
+            lambda d: (
+                (d / "tests" / "sample1.in").rename(d / "tests" / "01.in"),
+                (d / "tests" / "sample1.out").rename(d / "tests" / "01.out"),
+            ),
+            "exemple",
+        ),
+        (lambda d: (d / "hints.yaml").write_text("pas: une liste\n"), "hints.yaml"),
         (lambda d: (d / "solutions" / "solution.py").unlink(), "solution"),
         (
             lambda d: (d / "problem.yaml").write_text(
@@ -75,6 +89,13 @@ def test_upsert_is_idempotent(tmp_path, db):
     assert len(problems) == 1
     assert problems[0].title == "Somme (v2)"
     assert len(problems[0].tests) == 2
+    assert problems[0].tests[0].is_sample is True
+    assert problems[0].tests[1].is_sample is False
+    assert [h.content_fr for h in problems[0].hints] == [
+        "Lisez deux entiers.",
+        "Additionnez-les.",
+    ]
+    assert problems[0].editorial_fr is not None
 
 
 def test_repo_content_format_is_valid():

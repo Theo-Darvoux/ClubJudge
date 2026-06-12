@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.content.loader import ContentError, LoadedProblem, load_problem
 from app.judge.base import Judge
 from app.judge.types import Verdict
-from app.models import Problem, ProblemTag, ProblemTest
+from app.models import Problem, ProblemHint, ProblemTag, ProblemTest
 
 
 async def validate_solutions(problem: LoadedProblem, judge: Judge) -> None:
@@ -43,15 +43,26 @@ def upsert_problem(db: Session, loaded: LoadedProblem) -> Problem:
     problem.memory_limit_kb = loaded.memory_limit_kb
     problem.statement_fr = loaded.statement_fr
     problem.statement_en = loaded.statement_en
-    # Supprimer les anciens tags/tests avant d'insérer les nouveaux, sinon les
-    # contraintes d'unicité sautent (l'INSERT est flushé avant le DELETE orphelin).
+    problem.editorial_fr = loaded.editorial_fr
+    problem.editorial_en = loaded.editorial_en
+    # Supprimer les anciens tags/tests/indices avant d'insérer les nouveaux, sinon
+    # les contraintes d'unicité sautent (l'INSERT est flushé avant le DELETE orphelin).
     problem.tags.clear()
     problem.tests.clear()
+    problem.hints.clear()
     db.flush()
     problem.tags = [ProblemTag(tag=t) for t in loaded.tags]
     problem.tests = [
-        ProblemTest(position=i + 1, input=t.input, expected_output=t.expected_output)
+        ProblemTest(
+            position=i + 1,
+            input=t.input,
+            expected_output=t.expected_output,
+            is_sample=i < loaded.sample_count,
+        )
         for i, t in enumerate(loaded.tests)
+    ]
+    problem.hints = [
+        ProblemHint(position=i + 1, content_fr=h) for i, h in enumerate(loaded.hints)
     ]
     db.commit()
     return problem

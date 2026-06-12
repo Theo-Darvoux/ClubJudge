@@ -1,0 +1,13 @@
+# Indices progressifs : du plus vague au plus précis, un par élément.
+- >-
+  Les deux nombres arrivent sur la même ligne, séparés par un espace.
+  En Python, `input().split()` découpe la ligne en morceaux ; en C++,
+  `std::cin >> a >> b` saute les espaces tout seul.
+- >-
+  `input().split()` renvoie des **chaînes de caractères** : il faut les
+  convertir en entiers (`int(...)`) avant de pouvoir les additionner —
+  sinon `"2" + "3"` donne `"23"` !
+- >-
+  Question de type : $a$ et $b$ vont jusqu'à $10^9$, donc $a+b$ jusqu'à
+  $2 \times 10^9$. Ça tient *tout juste* dans un `int` 32 bits… utilisez un
+  `long long` en C/C++ pour ne pas avoir à y réfléchir.

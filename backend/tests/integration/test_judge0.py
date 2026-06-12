@@ -62,3 +62,15 @@ async def test_cpp_compilation_error(judge: Judge0Judge) -> None:
     result = await judge.submit(CPP_CE, Language.CPP, TESTS)
     assert result.verdict is Verdict.COMPILATION_ERROR
     assert result.compile_output
+
+
+async def test_run_captures_stdout(judge: Judge0Judge) -> None:
+    result = await judge.run(PYTHON_AC, Language.PYTHON, ["2 3\n", "40 2\n"])
+    assert [r.verdict for r in result.runs] == [Verdict.ACCEPTED, Verdict.ACCEPTED]
+    assert [r.stdout for r in result.runs] == ["5\n", "42\n"]
+
+
+async def test_run_captures_stderr_on_crash(judge: Judge0Judge) -> None:
+    result = await judge.run("raise ValueError('boum')", Language.PYTHON, ["\n"])
+    assert result.runs[0].verdict is Verdict.RUNTIME_ERROR
+    assert "boum" in (result.runs[0].stderr or "")

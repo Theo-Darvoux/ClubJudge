@@ -1,0 +1,16 @@
+# Indices progressifs : du plus vague au plus précis, un par élément.
+- >-
+  Essayer toutes les périodes possibles (chaque jour de début × chaque jour
+  de fin) coûte $O(n^2)$ — trop lent pour $n = 10^5$. Cherchez une façon de
+  parcourir les bilans **une seule fois**.
+- >-
+  La bonne question à se poser : quelle est la meilleure période qui se
+  termine **exactement au jour $i$** ? Soit elle prolonge la meilleure
+  période se terminant au jour $i-1$, soit elle recommence à neuf au jour
+  $i$. Quand vaut-il mieux recommencer ?
+- >-
+  La récurrence : `cur = max(b[i], cur + b[i])` (prolonger n'aide que si
+  `cur` est positif), et la réponse est le maximum de `cur` sur tous les
+  jours. Piège : la période ne peut pas être vide — initialisez avec le
+  premier bilan, pas avec 0, sinon le deuxième exemple (tout négatif)
+  renverra 0 au lieu de -1.

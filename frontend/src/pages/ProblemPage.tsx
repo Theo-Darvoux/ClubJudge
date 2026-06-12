@@ -1,13 +1,10 @@
 import Editor from '@monaco-editor/react';
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
-import rehypeKatex from 'rehype-katex';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
 import { ApiError, api } from '../api';
-import type { ProblemDetail, Submission, SubmissionLanguage } from '../api';
-import { DifficultyDots, VerdictChip } from '../components/badges';
+import type { ProblemDetail, RunResult, Submission, SubmissionLanguage } from '../api';
+import { DifficultyDots, VerdictBadge, VerdictChip } from '../components/badges';
+import { ProblemTabs } from '../components/ProblemTabs';
 import { useI18n } from '../i18n/context';
 import 'katex/dist/katex.min.css';
 
@@ -63,7 +60,7 @@ export function ProblemPage() {
 }
 
 function ProblemView({ slug }: { slug: string }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [language, setLanguageState] = useState<SubmissionLanguage>('cpp');
@@ -72,6 +69,11 @@ function ProblemView({ slug }: { slug: string }) {
   const [current, setCurrent] = useState<Submission | null>(null);
   const [busy, setBusy] = useState(false);
   const [cooldown, setCooldown] = useCountdown();
+  const [runResult, setRunResult] = useState<RunResult | null>(null);
+  const [runBusy, setRunBusy] = useState(false);
+  const [runCooldown, setRunCooldown] = useCountdown();
+  const [showCustom, setShowCustom] = useState(false);
+  const [customInput, setCustomInput] = useState('');
 
   useEffect(() => {
     api
@@ -123,6 +125,7 @@ function ProblemView({ slug }: { slug: string }) {
     try {
       const submission = await api.submit(slug, language, code);
       setCurrent(submission);
+      setRunResult(null); // place au verdict : l'essai libre a fait son office
       setCooldown(COOLDOWN_S);
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) {
@@ -131,6 +134,21 @@ function ProblemView({ slug }: { slug: string }) {
       }
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function run(custom?: string) {
+    setRunBusy(true);
+    try {
+      const result = await api.run(slug, language, code, custom);
+      setRunResult(result);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 429) {
+        const detail = err.detail as { retry_after_s?: number } | null;
+        setRunCooldown(detail?.retry_after_s ?? 3);
+      }
+    } finally {
+      setRunBusy(false);
     }
   }
 
@@ -143,11 +161,10 @@ function ProblemView({ slug }: { slug: string }) {
   }
   if (!problem) return <p className="mono-label">{t.problems.loading}</p>;
 
-  const statement =
-    lang === 'en' && problem.statement_en ? problem.statement_en : problem.statement_fr;
-  const showFallbackNote = lang === 'en' && !problem.statement_en;
   const monacoLang = LANGUAGES.find((l) => l.id === language)?.monaco ?? 'cpp';
-  const canSubmit = !busy && cooldown === 0 && code.trim().length > 0;
+  const hasCode = code.trim().length > 0;
+  const canSubmit = !busy && !runBusy && cooldown === 0 && hasCode;
+  const canRun = !busy && !runBusy && runCooldown === 0 && hasCode;
 
   return (
     <div className="problem-page">
@@ -180,12 +197,7 @@ function ProblemView({ slug }: { slug: string }) {
       </header>
 
       <div className="problem-columns">
-        <article className="statement">
-          {showFallbackNote && <p className="mono-label">{t.problem.statement_fallback_fr}</p>}
-          <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-            {statement}
-          </ReactMarkdown>
-        </article>
+        <ProblemTabs problem={problem} slug={slug} />
 
         <section className="workbench">
           <div className="workbench-bar">
@@ -232,6 +244,13 @@ function ProblemView({ slug }: { slug: string }) {
           </div>
 
           <div className="submit-row">
+            <button className="btn btn-ghost" onClick={() => run()} disabled={!canRun}>
+              {runBusy
+                ? t.problem.running
+                : runCooldown > 0
+                  ? t.problem.cooldown(runCooldown)
+                  : t.problem.run}
+            </button>
             <button className="btn btn-primary" onClick={submit} disabled={!canSubmit}>
               {busy
                 ? t.problem.submitting
@@ -248,6 +267,34 @@ function ProblemView({ slug }: { slug: string }) {
               )}
           </div>
 
+          <button
+            className="custom-input-toggle mono-label"
+            aria-expanded={showCustom}
+            onClick={() => setShowCustom((v) => !v)}
+          >
+            {showCustom ? '▾' : '▸'} {t.problem.custom_input_toggle}
+          </button>
+          {showCustom && (
+            <div className="custom-input">
+              <textarea
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value)}
+                placeholder={t.problem.custom_input_placeholder}
+                rows={4}
+                spellCheck={false}
+              />
+              <button
+                className="btn btn-ghost"
+                onClick={() => run(customInput)}
+                disabled={!canRun}
+              >
+                {runBusy ? t.problem.running : t.problem.run_custom}
+              </button>
+            </div>
+          )}
+
+          {runResult && <RunResults result={runResult} />}
+
           {current?.status === 'done' && current.verdict === 'CE' && current.compile_output && (
             <details className="compile-output" open>
               <summary className="mono-label">{t.problem.compile_output}</summary>
@@ -258,6 +305,80 @@ function ProblemView({ slug }: { slug: string }) {
           <SubmissionHistory history={history} />
         </section>
       </div>
+    </div>
+  );
+}
+
+function RunResults({ result }: { result: RunResult }) {
+  const { t } = useI18n();
+  const ref = useRef<HTMLDivElement>(null);
+  // Les résultats arrivent sous la ligne de flottaison : on les amène à l'écran.
+  useEffect(() => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [result]);
+  const allPassed =
+    result.cases.length > 0 &&
+    result.cases.every((c) => c.verdict === 'AC' && c.expected_output !== null);
+
+  return (
+    <div className="run-results" ref={ref}>
+      <div className="run-results-head">
+        <h2 className="mono-label">{t.problem.run_results}</h2>
+        <span className="run-note">{t.problem.run_no_judgment}</span>
+      </div>
+
+      {result.compile_output && (
+        <details className="compile-output" open>
+          <summary className="mono-label">{t.problem.compile_output}</summary>
+          <pre>{result.compile_output}</pre>
+        </details>
+      )}
+
+      {allPassed && <p className="run-all-passed">✓ {t.problem.run_all_passed}</p>}
+
+      {result.cases.map((c, i) => {
+        const isCustom = c.expected_output === null;
+        // Un exemple AC n'a rien à montrer de plus ; on détaille les échecs
+        // et toujours l'entrée personnalisée (voir sa sortie est le but).
+        const showDetail = isCustom || c.verdict !== 'AC';
+        return (
+          <section key={i} className={`run-case v-${c.verdict}`}>
+            <header className="run-case-head">
+              <span className="mono-label">
+                {isCustom ? t.problem.run_custom_case : t.problem.run_case(i + 1)}
+              </span>
+              <VerdictBadge verdict={c.verdict} />
+              {c.time_s != null && <span className="run-time">{c.time_s.toFixed(2)} s</span>}
+            </header>
+            {showDetail && (
+              <div className="run-case-body">
+                {!isCustom && (
+                  <div className="run-io">
+                    <h4 className="mono-label">{t.problem.run_input}</h4>
+                    <pre>{c.input || t.problem.run_empty_output}</pre>
+                  </div>
+                )}
+                {c.expected_output !== null && (
+                  <div className="run-io">
+                    <h4 className="mono-label">{t.problem.run_expected}</h4>
+                    <pre>{c.expected_output}</pre>
+                  </div>
+                )}
+                <div className="run-io">
+                  <h4 className="mono-label">{t.problem.run_got}</h4>
+                  <pre>{c.stdout || t.problem.run_empty_output}</pre>
+                </div>
+                {c.stderr && (
+                  <div className="run-io run-stderr">
+                    <h4 className="mono-label">{t.problem.run_stderr}</h4>
+                    <pre>{c.stderr}</pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }

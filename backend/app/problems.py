@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,11 +24,19 @@ class ProblemSummary(BaseModel):
     attempted: bool
 
 
+class SampleOut(BaseModel):
+    input: str
+    expected_output: str
+
+
 class ProblemDetail(ProblemSummary):
     statement_fr: str
     statement_en: str | None
     time_limit_s: float
     memory_limit_kb: int
+    samples: list[SampleOut]
+    hints: list[str]
+    has_editorial: bool
 
 
 @router.get("")
@@ -90,7 +99,13 @@ def get_problem(
     user: Annotated[User, Depends(get_current_user)],
 ) -> ProblemDetail:
     problem = db.scalar(
-        select(Problem).options(selectinload(Problem.tags)).where(Problem.slug == slug)
+        select(Problem)
+        .options(
+            selectinload(Problem.tags),
+            selectinload(Problem.tests),
+            selectinload(Problem.hints),
+        )
+        .where(Problem.slug == slug)
     )
     if problem is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
@@ -114,4 +129,99 @@ def get_problem(
         statement_en=problem.statement_en,
         time_limit_s=problem.time_limit_s,
         memory_limit_kb=problem.memory_limit_kb,
+        samples=[
+            SampleOut(input=t.input, expected_output=t.expected_output)
+            for t in problem.tests
+            if t.is_sample
+        ],
+        hints=[h.content_fr for h in problem.hints],
+        has_editorial=problem.editorial_fr is not None,
     )
+
+
+def _get_problem_or_404(db: Session, slug: str) -> Problem:
+    problem = db.scalar(select(Problem).where(Problem.slug == slug))
+    if problem is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
+    return problem
+
+
+def _require_own_ac(db: Session, user: User, problem: Problem) -> None:
+    """Éditorial et solutions des autres ne s'ouvrent qu'après son propre AC
+    (PLAN.md : « on apprend en séchant »)."""
+    solved = db.scalar(
+        select(Submission.id)
+        .where(
+            Submission.user_id == user.id,
+            Submission.problem_id == problem.id,
+            Submission.verdict == Verdict.ACCEPTED,
+        )
+        .limit(1)
+    )
+    if solved is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "solve_first")
+
+
+class EditorialOut(BaseModel):
+    editorial_fr: str
+    editorial_en: str | None
+
+
+@router.get("/{slug}/editorial")
+def get_editorial(
+    slug: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> EditorialOut:
+    problem = _get_problem_or_404(db, slug)
+    if problem.editorial_fr is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no_editorial")
+    _require_own_ac(db, user, problem)
+    return EditorialOut(editorial_fr=problem.editorial_fr, editorial_en=problem.editorial_en)
+
+
+class SolutionOut(BaseModel):
+    id: int
+    author: str
+    is_mine: bool
+    language: str
+    time_s: float | None
+    memory_kb: int | None
+    created_at: datetime
+    source_code: str
+
+
+@router.get("/{slug}/solutions")
+def list_solutions(
+    slug: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> list[SolutionOut]:
+    problem = _get_problem_or_404(db, slug)
+    _require_own_ac(db, user, problem)
+
+    accepted = db.scalars(
+        select(Submission)
+        .options(selectinload(Submission.user))
+        .where(Submission.problem_id == problem.id, Submission.verdict == Verdict.ACCEPTED)
+        .order_by(Submission.time_s.asc().nulls_last(), Submission.created_at.asc())
+    ).all()
+
+    # Une seule entrée par membre et par langage : sa plus rapide.
+    best: dict[tuple[int, str], Submission] = {}
+    for s in accepted:
+        best.setdefault((s.user_id, s.language), s)
+
+    return [
+        SolutionOut(
+            id=s.id,
+            author=s.user.display_name,
+            is_mine=s.user_id == user.id,
+            language=s.language,
+            time_s=s.time_s,
+            memory_kb=s.memory_kb,
+            created_at=s.created_at,
+            source_code=s.source_code,
+        )
+        for s in sorted(best.values(), key=lambda s: (s.time_s is None, s.time_s or 0.0))
+    ]

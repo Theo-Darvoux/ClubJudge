@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from app.judge.types import JudgeResult, Language, TestCase
+from app.judge.types import JudgeResult, Language, RunResult, TestCase
 
 
 class Judge(ABC):
@@ -21,3 +21,20 @@ class Judge(ABC):
         time_limit_s: float = 2.0,
         memory_limit_kb: int = 262_144,
     ) -> JudgeResult: ...
+
+    @abstractmethod
+    async def run(
+        self,
+        source_code: str,
+        language: Language,
+        inputs: list[str],
+        *,
+        time_limit_s: float = 2.0,
+        memory_limit_kb: int = 262_144,
+    ) -> RunResult:
+        """Execute without judging: no expected output, stdout/stderr captured.
+
+        Backs the « Exécuter sur les exemples » button — never recorded as a
+        submission.
+        """
+        ...

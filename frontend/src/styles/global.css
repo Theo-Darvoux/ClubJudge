@@ -810,3 +810,301 @@ select {
   color: var(--ink);
   font-size: 1.05em;
 }
+
+/* ===== Phase 1b — onglets de la colonne énoncé ===== */
+
+.statement-tabs {
+  display: flex;
+  gap: 0.3rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1.4rem;
+  flex-wrap: wrap;
+}
+
+.statement-tab {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: -1px;
+  transition: color 0.15s ease;
+}
+
+.statement-tab:hover {
+  color: var(--ink);
+}
+
+.statement-tab.is-active {
+  color: var(--lav);
+  border-bottom-color: var(--lav);
+}
+
+.tab-lock {
+  font-size: 0.85em;
+  opacity: 0.6;
+}
+
+/* ===== Indices progressifs ===== */
+
+.hints-intro {
+  color: var(--ink-dim);
+  font-size: 0.92rem;
+  margin-bottom: 1.2rem;
+}
+
+.hint-card {
+  border: 1px solid var(--line-soft);
+  border-left: 2px solid var(--lav);
+  background: var(--bg-raised);
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 0.9rem;
+  animation: verdict-in 0.3s var(--ease-out);
+}
+
+.hint-card .mono-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--lav-soft);
+}
+
+.hint-card p:last-child {
+  margin-bottom: 0;
+}
+
+.hint-reveal {
+  margin-top: 0.3rem;
+}
+
+/* ===== Panneaux verrouillés (éditorial / solutions avant AC) ===== */
+
+.locked-panel {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  border: 1px dashed var(--line);
+  color: var(--ink-dim);
+}
+
+.locked-panel h3 {
+  font-family: var(--font-display);
+  color: var(--ink-soft);
+  margin-bottom: 0.4rem;
+}
+
+.locked-panel p {
+  font-size: 0.92rem;
+  max-width: 26rem;
+  margin-inline: auto;
+}
+
+.locked-glyph {
+  display: block;
+  font-size: 1.6rem;
+  color: var(--lav-soft);
+  opacity: 0.7;
+  margin-bottom: 0.8rem;
+}
+
+/* ===== Solutions des autres membres ===== */
+
+.solutions-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.solutions-filters {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.solutions-filters select {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.solution-card {
+  border: 1px solid var(--line-soft);
+  background: var(--bg-raised);
+  margin-bottom: 1rem;
+}
+
+.solution-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--line-soft);
+  flex-wrap: wrap;
+}
+
+.solution-author {
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mine-chip {
+  color: var(--lav);
+}
+
+.solution-meta {
+  color: var(--ink-dim);
+}
+
+.solution-code {
+  padding: 0.8rem 1rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  max-height: 24rem;
+  margin: 0;
+}
+
+/* ===== Exécution d'essai (exemples + entrée personnalisée) ===== */
+
+.custom-input-toggle {
+  background: none;
+  border: none;
+  color: var(--ink-dim);
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.custom-input-toggle:hover {
+  color: var(--ink);
+}
+
+.custom-input {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+}
+
+.custom-input textarea {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 0.7rem 0.9rem;
+  resize: vertical;
+}
+
+.custom-input textarea:focus-visible {
+  outline: 1px solid var(--lav);
+  outline-offset: -1px;
+}
+
+.run-results {
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.run-results-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.run-note {
+  font-size: 0.82rem;
+  color: var(--ink-dim);
+}
+
+.run-all-passed {
+  color: var(--verdict-ac);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.run-case {
+  border: 1px solid var(--line-soft);
+  border-left: 2px solid var(--line);
+}
+
+.run-case.v-AC {
+  border-left-color: var(--verdict-ac);
+}
+
+.run-case.v-WA {
+  border-left-color: var(--verdict-wa);
+}
+
+.run-case.v-TLE {
+  border-left-color: var(--verdict-tle);
+}
+
+.run-case.v-MLE,
+.run-case.v-RE {
+  border-left-color: var(--verdict-re);
+}
+
+.run-case.v-CE,
+.run-case.v-IE {
+  border-left-color: var(--verdict-ce);
+}
+
+.run-case-head {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.5rem 0.9rem;
+}
+
+.run-case-head .verdict-chip {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.55rem;
+}
+
+.run-time {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--ink-dim);
+  margin-left: auto;
+}
+
+.run-case-body {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0 0.9rem 0.8rem;
+}
+
+.run-io h4 {
+  margin: 0 0 0.25rem;
+  color: var(--ink-dim);
+  font-weight: 400;
+}
+
+.run-io pre {
+  background: var(--bg);
+  border: 1px solid var(--line-soft);
+  padding: 0.5rem 0.7rem;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  max-height: 9rem;
+  margin: 0;
+}
+
+.run-stderr pre {
+  color: var(--verdict-wa);
+}

@@ -15,14 +15,55 @@ export interface ProblemSummary {
   attempted: boolean;
 }
 
+export interface Sample {
+  input: string;
+  expected_output: string;
+}
+
 export interface ProblemDetail extends ProblemSummary {
   statement_fr: string;
   statement_en: string | null;
   time_limit_s: number;
   memory_limit_kb: number;
+  samples: Sample[];
+  hints: string[];
+  has_editorial: boolean;
+}
+
+export interface Editorial {
+  editorial_fr: string;
+  editorial_en: string | null;
+}
+
+export interface SharedSolution {
+  id: number;
+  author: string;
+  is_mine: boolean;
+  language: SubmissionLanguage;
+  time_s: number | null;
+  memory_kb: number | null;
+  created_at: string;
+  source_code: string;
 }
 
 export type SubmissionLanguage = 'cpp' | 'python' | 'c' | 'java';
+
+export type Verdict = 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' | 'IE';
+
+export interface RunCase {
+  verdict: Verdict;
+  input: string;
+  expected_output: string | null;
+  stdout: string | null;
+  stderr: string | null;
+  time_s: number | null;
+  memory_kb: number | null;
+}
+
+export interface RunResult {
+  compile_output: string | null;
+  cases: RunCase[];
+}
 
 export interface Submission {
   id: number;
@@ -108,4 +149,16 @@ export const api = {
     }),
   submission: (id: number) => request<Submission>(`/api/submissions/${id}`),
   mySubmissions: (slug: string) => request<Submission[]>(`/api/problems/${slug}/submissions`),
+
+  run: (slug: string, language: SubmissionLanguage, sourceCode: string, customInput?: string) =>
+    request<RunResult>(`/api/problems/${slug}/run`, {
+      method: 'POST',
+      body: JSON.stringify({
+        language,
+        source_code: sourceCode,
+        custom_input: customInput ?? null,
+      }),
+    }),
+  editorial: (slug: string) => request<Editorial>(`/api/problems/${slug}/editorial`),
+  solutions: (slug: string) => request<SharedSolution[]>(`/api/problems/${slug}/solutions`),
 };

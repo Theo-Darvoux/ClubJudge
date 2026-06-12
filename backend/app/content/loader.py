@@ -46,7 +46,12 @@ class LoadedProblem:
     memory_limit_kb: int
     statement_fr: str
     statement_en: str | None
+    editorial_fr: str | None = None
+    editorial_en: str | None = None
+    hints: list[str] = field(default_factory=list)
+    # Les exemples (sample*.in) sont placés en tête de la liste.
     tests: list[TestCase] = field(default_factory=list)
+    sample_count: int = 0
     solutions: list[ReferenceSolution] = field(default_factory=list)
 
 
@@ -80,15 +85,44 @@ def load_problem(problem_dir: Path) -> LoadedProblem:
 
     tests_dir = problem_dir / "tests"
     _require(tests_dir.is_dir(), tests_dir, "dossier tests/ manquant")
+    # Convention : sample*.in = exemples de l'énoncé (publics, exécutables sans
+    # soumettre), le reste = tests secrets. Les exemples passent en premier.
+    sample_paths = sorted(tests_dir.glob("sample*.in"))
+    secret_paths = [p for p in sorted(tests_dir.glob("*.in")) if p not in sample_paths]
     tests: list[TestCase] = []
-    for in_path in sorted(tests_dir.glob("*.in")):
+    for in_path in sample_paths + secret_paths:
         out_path = in_path.with_suffix(".out")
         _require(out_path.is_file(), out_path, f"sortie attendue manquante pour {in_path.name}")
         tests.append(TestCase(input=in_path.read_text(), expected_output=out_path.read_text()))
+    _require(len(sample_paths) >= 1, tests_dir,
+             "au moins un test exemple requis (sample1.in/sample1.out, "
+             "reprenant l'exemple de l'énoncé)")
     _require(len(tests) >= 2, tests_dir, "au moins 2 tests requis (un exemple ne suffit pas)")
     orphans = [p.name for p in sorted(tests_dir.glob("*.out"))
                if not p.with_suffix(".in").is_file()]
     _require(not orphans, tests_dir, f"fichiers .out sans .in correspondant : {orphans}")
+
+    hints_path = problem_dir / "hints.yaml"
+    hints: list[str] = []
+    if hints_path.is_file():
+        raw_hints = yaml.safe_load(hints_path.read_text())
+        _require(
+            isinstance(raw_hints, list)
+            and len(raw_hints) >= 1
+            and all(isinstance(h, str) and h.strip() for h in raw_hints),
+            hints_path,
+            "hints.yaml doit être une liste YAML de chaînes non vides "
+            "(un indice par élément, du plus vague au plus précis)",
+        )
+        hints = [h.strip() for h in raw_hints]
+
+    editorial_fr_path = problem_dir / "editorial.fr.md"
+    editorial_en_path = problem_dir / "editorial.en.md"
+    _require(
+        not editorial_en_path.is_file() or editorial_fr_path.is_file(),
+        editorial_en_path,
+        "editorial.en.md présent sans editorial.fr.md (le français est la langue de référence)",
+    )
 
     solutions_dir = problem_dir / "solutions"
     _require(solutions_dir.is_dir(), solutions_dir, "dossier solutions/ manquant")
@@ -111,7 +145,11 @@ def load_problem(problem_dir: Path) -> LoadedProblem:
         memory_limit_kb=int(meta.get("memory_limit_kb", 262_144)),
         statement_fr=statement_path.read_text(),
         statement_en=statement_en_path.read_text() if statement_en_path.is_file() else None,
+        editorial_fr=editorial_fr_path.read_text() if editorial_fr_path.is_file() else None,
+        editorial_en=editorial_en_path.read_text() if editorial_en_path.is_file() else None,
+        hints=hints,
         tests=tests,
+        sample_count=len(sample_paths),
         solutions=solutions,
     )
 

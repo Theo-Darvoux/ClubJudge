@@ -1,4 +1,4 @@
-import type { Submission } from '../api';
+import type { Submission, Verdict } from '../api';
 import { useI18n } from '../i18n/context';
 
 export function DifficultyDots({ level }: { level: number }) {
@@ -38,6 +38,11 @@ export function StatusMark({
     );
   }
   return <span className="status-mark" aria-hidden="true" />;
+}
+
+export function VerdictBadge({ verdict }: { verdict: Verdict }) {
+  const { t } = useI18n();
+  return <span className={`verdict-chip v-${verdict}`}>{t.verdict[verdict]}</span>;
 }
 
 export function VerdictChip({ submission }: { submission: Submission }) {

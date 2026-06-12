@@ -33,6 +33,23 @@ class TestVerdict:
 
 
 @dataclass(frozen=True)
+class RunOutput:
+    """Result of one execution without expected output (run on examples)."""
+
+    verdict: Verdict  # ACCEPTED = le programme s'est exécuté sans encombre
+    stdout: str | None = None
+    stderr: str | None = None
+    time_s: float | None = None
+    memory_kb: int | None = None
+
+
+@dataclass(frozen=True)
+class RunResult:
+    runs: list[RunOutput] = field(default_factory=list)
+    compile_output: str | None = None
+
+
+@dataclass(frozen=True)
 class JudgeResult:
     """Aggregated verdict: first non-AC test decides, ICPC-style."""
 

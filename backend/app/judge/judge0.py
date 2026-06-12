@@ -4,7 +4,15 @@ import base64
 import httpx
 
 from app.judge.base import Judge
-from app.judge.types import JudgeResult, Language, TestCase, TestVerdict, Verdict
+from app.judge.types import (
+    JudgeResult,
+    Language,
+    RunOutput,
+    RunResult,
+    TestCase,
+    TestVerdict,
+    Verdict,
+)
 
 # Judge0 CE language ids (GET /languages on the instance to verify).
 LANGUAGE_IDS: dict[Language, int] = {
@@ -35,6 +43,12 @@ _FINAL_STATUSES = frozenset(STATUS_TO_VERDICT)
 
 def _b64(s: str) -> str:
     return base64.b64encode(s.encode()).decode()
+
+
+def _b64decode(value: str | None) -> str | None:
+    if not value:
+        return None
+    return base64.b64decode(value).decode(errors="replace")
 
 
 class Judge0Judge(Judge):
@@ -71,19 +85,77 @@ class Judge0Judge(Judge):
             ]
         }
 
+        raw = await self._submit_batch(payload, fields="status_id,time,memory,compile_output")
+        return self._aggregate(raw, memory_limit_kb)
+
+    async def run(
+        self,
+        source_code: str,
+        language: Language,
+        inputs: list[str],
+        *,
+        time_limit_s: float = 2.0,
+        memory_limit_kb: int = 262_144,
+    ) -> RunResult:
+        if not inputs:
+            raise ValueError("at least one input is required")
+
+        # Pas d'expected_output : Judge0 répond Accepted dès que l'exécution
+        # aboutit, et on récupère stdout/stderr pour les montrer à l'utilisateur.
+        payload = {
+            "submissions": [
+                {
+                    "source_code": _b64(source_code),
+                    "language_id": LANGUAGE_IDS[language],
+                    "stdin": _b64(stdin),
+                    "cpu_time_limit": time_limit_s,
+                    "memory_limit": memory_limit_kb,
+                }
+                for stdin in inputs
+            ]
+        }
+
+        raw = await self._submit_batch(
+            payload, fields="status_id,time,memory,compile_output,stdout,stderr"
+        )
+
+        runs: list[RunOutput] = []
+        compile_output: str | None = None
+        for sub in raw:
+            verdict = STATUS_TO_VERDICT[sub["status_id"]]
+            if (
+                verdict is Verdict.RUNTIME_ERROR
+                and sub.get("memory") is not None
+                and sub["memory"] >= memory_limit_kb
+            ):
+                verdict = Verdict.MEMORY_LIMIT_EXCEEDED
+            if compile_output is None:
+                compile_output = _b64decode(sub.get("compile_output"))
+            runs.append(
+                RunOutput(
+                    verdict=verdict,
+                    stdout=_b64decode(sub.get("stdout")),
+                    stderr=_b64decode(sub.get("stderr")),
+                    time_s=float(sub["time"]) if sub.get("time") is not None else None,
+                    memory_kb=sub.get("memory"),
+                )
+            )
+        return RunResult(runs=runs, compile_output=compile_output)
+
+    async def _submit_batch(self, payload: dict, *, fields: str) -> list[dict]:
         async with httpx.AsyncClient(base_url=self._base_url, timeout=30.0) as client:
             resp = await client.post("/submissions/batch?base64_encoded=true", json=payload)
             resp.raise_for_status()
             tokens = [entry["token"] for entry in resp.json()]
-            raw = await self._poll(client, tokens)
+            return await self._poll(client, tokens, fields=fields)
 
-        return self._aggregate(raw, memory_limit_kb)
-
-    async def _poll(self, client: httpx.AsyncClient, tokens: list[str]) -> list[dict]:
+    async def _poll(
+        self, client: httpx.AsyncClient, tokens: list[str], *, fields: str
+    ) -> list[dict]:
         params = {
             "tokens": ",".join(tokens),
             "base64_encoded": "true",
-            "fields": "status_id,time,memory,compile_output",
+            "fields": fields,
         }
         async with asyncio.timeout(self._timeout_s):
             while True:

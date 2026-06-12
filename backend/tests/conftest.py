@@ -4,20 +4,31 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app import submissions
 from app.db import Base, get_db
 from app.judge.base import Judge
-from app.judge.types import JudgeResult, Language, TestCase, TestVerdict, Verdict
+from app.judge.types import (
+    JudgeResult,
+    Language,
+    RunOutput,
+    RunResult,
+    TestCase,
+    TestVerdict,
+    Verdict,
+)
 from app.main import app
 from app.models import Problem, ProblemTest
-from app.submissions import get_worker
+from app.submissions import get_judge, get_worker
 
 
 class FakeJudge(Judge):
     """Juge déterministe pour les tests : verdict fixé à la construction."""
 
-    def __init__(self, verdict: Verdict = Verdict.ACCEPTED):
+    def __init__(self, verdict: Verdict = Verdict.ACCEPTED, stdout: str = "ok\n"):
         self.verdict = verdict
+        self.stdout = stdout
         self.calls: list[str] = []
+        self.run_calls: list[list[str]] = []
 
     async def submit(
         self,
@@ -33,6 +44,24 @@ class FakeJudge(Judge):
             TestVerdict(verdict=self.verdict, time_s=0.01, memory_kb=1024) for _ in tests
         ]
         return JudgeResult(verdict=self.verdict, tests=per_test)
+
+    async def run(
+        self,
+        source_code: str,
+        language: Language,
+        inputs: list[str],
+        *,
+        time_limit_s: float = 2.0,
+        memory_limit_kb: int = 262_144,
+    ) -> RunResult:
+        self.run_calls.append(inputs)
+        # AC simulé = exécution réussie ; le stdout fixé permet de tester la
+        # comparaison aux sorties attendues faite côté endpoint.
+        runs = [
+            RunOutput(verdict=self.verdict, stdout=self.stdout, time_s=0.01, memory_kb=1024)
+            for _ in inputs
+        ]
+        return RunResult(runs=runs)
 
 
 class StubWorker:
@@ -66,13 +95,20 @@ def stub_worker():
 
 
 @pytest.fixture
-def client(session_factory, stub_worker):
+def fake_judge():
+    return FakeJudge(stdout="5\n")
+
+
+@pytest.fixture
+def client(session_factory, stub_worker, fake_judge):
     def override_get_db():
         with session_factory() as session:
             yield session
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_worker] = lambda: stub_worker
+    app.dependency_overrides[get_judge] = lambda: fake_judge
+    submissions._last_run_at.clear()  # cooldown des runs, sinon il fuit entre tests
     # Pas de `with` : on évite le lifespan (worker réel) en tests unitaires.
     yield TestClient(app)
     app.dependency_overrides.clear()
@@ -87,7 +123,7 @@ def problem(db) -> Problem:
         difficulty=1,
         statement_fr="Calculez $a+b$.",
         tests=[
-            ProblemTest(position=1, input="2 3\n", expected_output="5\n"),
+            ProblemTest(position=1, input="2 3\n", expected_output="5\n", is_sample=True),
             ProblemTest(position=2, input="40 2\n", expected_output="42\n"),
         ],
     )

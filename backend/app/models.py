@@ -1,7 +1,17 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -55,6 +65,8 @@ class Problem(Base):
     memory_limit_kb: Mapped[int] = mapped_column(default=262_144)
     statement_fr: Mapped[str] = mapped_column(Text)
     statement_en: Mapped[str | None] = mapped_column(Text, default=None)
+    editorial_fr: Mapped[str | None] = mapped_column(Text, default=None)
+    editorial_en: Mapped[str | None] = mapped_column(Text, default=None)
     imported_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -64,6 +76,9 @@ class Problem(Base):
     )
     tests: Mapped[list["ProblemTest"]] = relationship(
         back_populates="problem", cascade="all, delete-orphan", order_by="ProblemTest.position"
+    )
+    hints: Mapped[list["ProblemHint"]] = relationship(
+        back_populates="problem", cascade="all, delete-orphan", order_by="ProblemHint.position"
     )
 
 
@@ -87,8 +102,22 @@ class ProblemTest(Base):
     position: Mapped[int] = mapped_column(Integer)
     input: Mapped[str] = mapped_column(Text)
     expected_output: Mapped[str] = mapped_column(Text)
+    # Les exemples de l'énoncé : visibles, et exécutables sans soumettre.
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=False)
 
     problem: Mapped[Problem] = relationship(back_populates="tests")
+
+
+class ProblemHint(Base):
+    __tablename__ = "problem_hints"
+    __table_args__ = (UniqueConstraint("problem_id", "position"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id", ondelete="CASCADE"))
+    position: Mapped[int] = mapped_column(Integer)
+    content_fr: Mapped[str] = mapped_column(Text)
+
+    problem: Mapped[Problem] = relationship(back_populates="hints")
 
 
 class Submission(Base):

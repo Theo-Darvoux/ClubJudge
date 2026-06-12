@@ -1,0 +1,14 @@
+# Indices progressifs : du plus vague au plus précis, un par élément.
+- >-
+  Pas besoin d'inventer un algorithme de tri : tous les langages en ont un,
+  rapide et déjà débogué, dans leur bibliothèque standard.
+- >-
+  Si vous avez un TLE : un tri « maison » par bulles ou par insertion coûte
+  $O(n^2)$, soit $10^{10}$ opérations pour $n = 10^5$ — beaucoup trop. Les
+  tris de bibliothèque (`sorted`, `std::sort`, `Arrays.sort`) sont en
+  $O(n \log n)$.
+- >-
+  Pensez aussi à la sortie : afficher les nombres un par un peut être lent.
+  En Python, construisez la ligne d'un coup avec
+  `" ".join(map(str, dossards))` ; en C++, évitez `std::endl` dans une
+  boucle (préférez `"\n"` ou un seul affichage final).

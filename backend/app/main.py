@@ -14,7 +14,9 @@ from app.judging import JudgeWorker
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    worker = JudgeWorker(Judge0Judge(get_settings().judge0_url))
+    judge = Judge0Judge(get_settings().judge0_url)
+    worker = JudgeWorker(judge)
+    app.state.judge = judge  # exécutions d'essai synchrones (run sur exemples)
     app.state.judge_worker = worker
     await worker.start()
     yield
