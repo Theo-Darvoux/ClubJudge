@@ -17,6 +17,7 @@ dependencies = [
 
 [project.scripts]
 clubjudge-content = "app.content.cli:main"
+clubjudge-admin = "app.admin_cli:main"
 
 [build-system]
 requires = ["hatchling"]

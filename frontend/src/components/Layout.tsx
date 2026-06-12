@@ -21,14 +21,18 @@ export function Layout() {
             <NavLink to="/problems" className="nav-link">
               {t.nav.problems}
             </NavLink>
-            <span className="nav-link is-disabled">
+            <NavLink to="/contests" className="nav-link">
               {t.nav.contests}
-              <span className="soon-chip">{t.nav.soon}</span>
-            </span>
+            </NavLink>
             <span className="nav-link is-disabled">
               {t.nav.courses}
               <span className="soon-chip">{t.nav.soon}</span>
             </span>
+            {user?.role === 'admin' && (
+              <NavLink to="/admin" className="nav-link">
+                {t.admin.nav}
+              </NavLink>
+            )}
           </nav>
 
           <div className="nav-side">

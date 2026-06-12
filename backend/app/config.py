@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     content_dir: str = "../content"
     # Intervalle minimal entre deux soumissions d'un même utilisateur.
     submission_cooldown_s: int = 10
+    # Webhook Discord du club pour les annonces (vide = annonces désactivées).
+    discord_webhook_url: str = ""
 
 
 @lru_cache

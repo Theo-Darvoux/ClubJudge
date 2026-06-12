@@ -43,12 +43,16 @@ export function ProblemTabs({ problem, slug }: { problem: ProblemDetail; slug: s
 
   const tabs: { id: TabId; label: string; locked?: boolean }[] = [
     { id: 'statement', label: t.problem.tabs.statement },
-    { id: 'hints', label: `${t.problem.tabs.hints} · ${problem.hints.length}` },
   ];
-  if (problem.has_editorial) {
-    tabs.push({ id: 'editorial', label: t.problem.tabs.editorial, locked: !problem.solved });
+  // Pendant un contest, conditions ICPC : énoncé seul (l'API ferme de toute
+  // façon indices, éditorial et solutions tant que la fenêtre est ouverte).
+  if (!problem.contest) {
+    tabs.push({ id: 'hints', label: `${t.problem.tabs.hints} · ${problem.hints.length}` });
+    if (problem.has_editorial) {
+      tabs.push({ id: 'editorial', label: t.problem.tabs.editorial, locked: !problem.solved });
+    }
+    tabs.push({ id: 'solutions', label: t.problem.tabs.solutions, locked: !problem.solved });
   }
-  tabs.push({ id: 'solutions', label: t.problem.tabs.solutions, locked: !problem.solved });
 
   return (
     <article className="statement">

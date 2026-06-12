@@ -5,7 +5,10 @@ import { AuthProvider } from './auth/AuthProvider';
 import { Layout } from './components/Layout';
 import { RequireAuth } from './components/RequireAuth';
 import { I18nProvider } from './i18n';
+import { AdminPage } from './pages/AdminPage';
 import { AuthPage } from './pages/AuthPage';
+import { ContestPage } from './pages/ContestPage';
+import { ContestsPage } from './pages/ContestsPage';
 import { ProblemPage } from './pages/ProblemPage';
 import { ProblemsPage } from './pages/ProblemsPage';
 import { SkillTreePage } from './pages/SkillTreePage';
@@ -28,6 +31,9 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/problems" element={<SkillTreePage />} />
               <Route path="/problems/list" element={<ProblemsPage />} />
               <Route path="/problems/:slug" element={<ProblemPage />} />
+              <Route path="/contests" element={<ContestsPage />} />
+              <Route path="/contests/:slug" element={<ContestPage />} />
+              <Route path="/admin" element={<AdminPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/problems" replace />} />
           </Routes>

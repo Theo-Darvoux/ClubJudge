@@ -1372,3 +1372,478 @@ select {
 .skill-problems .difficulty-label {
   display: none;
 }
+
+/* ---- Compétitions ------------------------------------------------------- */
+
+.contest-section {
+  margin-bottom: 2.6rem;
+}
+
+.contest-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.contest-cards {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.contest-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1.1rem 1.4rem;
+  text-decoration: none;
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--notch)) 0,
+    100% var(--notch),
+    100% 100%,
+    var(--notch) 100%,
+    0 calc(100% - var(--notch))
+  );
+  transition: box-shadow 0.25s var(--ease-out), transform 0.25s var(--ease-out);
+}
+
+.contest-card:hover {
+  box-shadow: inset 0 0 0 1px var(--lav-25);
+  transform: translateY(-2px);
+}
+
+.contest-card-main {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.contest-card-main h2 {
+  font-size: 1.25rem;
+}
+
+.contest-card-meta {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.contest-card-side {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-shrink: 0;
+}
+
+.contest-card-cta {
+  color: var(--lav);
+}
+
+.live-chip {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bg);
+  background: var(--lav);
+  padding: 0.16rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.live-chip::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.registered-chip {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--verdict-ac);
+  background: color-mix(in srgb, var(--verdict-ac) 12%, transparent);
+  padding: 0.16rem 0.5rem;
+  white-space: nowrap;
+}
+
+/* ---- Page contest ------------------------------------------------------- */
+
+.contest-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2rem;
+  margin-bottom: 1.8rem;
+  flex-wrap: wrap;
+}
+
+.contest-head-main {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.contest-head-main .overline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.contest-head-main h1 {
+  font-size: clamp(1.7rem, 3.6vw, 2.3rem);
+}
+
+.contest-window {
+  letter-spacing: 0.08em;
+}
+
+.contest-head-side {
+  display: grid;
+  gap: 0.9rem;
+  justify-items: end;
+  text-align: right;
+}
+
+.contest-countdown {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.contest-countdown strong {
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: var(--lav);
+  letter-spacing: 0.04em;
+}
+
+.contest-reg-state {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.contest-finished-note {
+  color: var(--ink-dim);
+}
+
+.contest-description {
+  max-width: 46rem;
+  color: var(--ink-soft);
+  margin-bottom: 2rem;
+}
+
+.contest-note {
+  color: var(--ink-soft);
+  max-width: 46rem;
+  margin-bottom: 1.4rem;
+}
+
+.contest-problems,
+.contest-scoreboard {
+  margin-bottom: 2.6rem;
+}
+
+.problem-table .col-label {
+  width: 3rem;
+}
+
+/* ---- Scoreboard --------------------------------------------------------- */
+
+.scoreboard-refresh {
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+  text-transform: none;
+}
+
+.scoreboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.scoreboard-table th {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  font-weight: 500;
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.scoreboard-table td {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.scoreboard-table .col-rank,
+.scoreboard-table .col-num {
+  width: 4.5rem;
+}
+
+.scoreboard-table th.col-problem,
+.scoreboard-table .score-cell {
+  text-align: center;
+  width: 4.2rem;
+}
+
+.scoreboard-table tr.is-me td {
+  background: var(--lav-08);
+}
+
+.me-chip {
+  margin-left: 0.5rem;
+  color: var(--lav);
+}
+
+.score-cell {
+  font-family: var(--font-mono);
+  line-height: 1.25;
+}
+
+.score-cell-main {
+  display: block;
+  font-weight: 700;
+}
+
+.score-cell-time {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+}
+
+.score-cell.is-solved .score-cell-main {
+  color: var(--verdict-ac);
+}
+
+.score-cell.is-first-blood {
+  background: color-mix(in srgb, var(--lav) 10%, transparent);
+}
+
+.first-blood-mark {
+  color: var(--lav);
+  margin-right: 0.15rem;
+}
+
+.score-cell.is-failed .score-cell-main {
+  color: var(--verdict-wa);
+}
+
+.score-cell.is-pending,
+.score-cell.is-empty {
+  color: var(--ink-dim);
+}
+
+.scoreboard-legend {
+  display: flex;
+  gap: 1.6rem;
+  margin-top: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: none;
+}
+
+/* ---- Bannière contest (page problème) ----------------------------------- */
+
+.contest-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 1.1rem;
+  margin-bottom: 1.4rem;
+  background: var(--lav-08);
+  box-shadow: inset 0 0 0 1px var(--lav-14);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--notch-sm)) 0,
+    100% var(--notch-sm),
+    100% 100%,
+    var(--notch-sm) 100%,
+    0 calc(100% - var(--notch-sm))
+  );
+}
+
+.contest-banner-text {
+  color: var(--ink-soft);
+}
+
+.contest-banner-text strong {
+  color: var(--ink);
+}
+
+.contest-banner-end {
+  margin-left: auto;
+  letter-spacing: 0.08em;
+}
+
+/* ---- Administration ------------------------------------------------------ */
+
+.admin-flash {
+  padding: 0.7rem 1.1rem;
+  margin-bottom: 1.4rem;
+  background: color-mix(in srgb, var(--verdict-ac) 10%, transparent);
+  color: var(--verdict-ac);
+  font-size: 0.95rem;
+}
+
+.admin-flash.is-error {
+  background: color-mix(in srgb, var(--verdict-wa) 10%, transparent);
+  color: var(--verdict-wa);
+}
+
+.admin-form {
+  padding: 1.4rem;
+  margin-bottom: 2.4rem;
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.4rem;
+}
+
+.admin-form-grid label,
+.admin-rejudge-row {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.admin-form-wide {
+  grid-column: 1 / -1;
+}
+
+.admin-form-grid input,
+.admin-form-grid textarea,
+.admin-rejudge-row input,
+.admin-problems select {
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 0.55rem 0.8rem;
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.admin-form-grid input:disabled {
+  color: var(--ink-dim);
+}
+
+.admin-problems {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 1.4rem;
+}
+
+.admin-problems ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.admin-problems li {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.45rem 0.8rem;
+  background: var(--lav-08);
+}
+
+.admin-problem-title {
+  margin-right: auto;
+}
+
+.admin-form-actions {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.admin-contests,
+.admin-rejudge {
+  margin-bottom: 2.6rem;
+}
+
+.admin-contest-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.admin-contest-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.8rem 1.1rem;
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+}
+
+.admin-contest-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.phase-chip {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.16rem 0.5rem;
+  background: var(--lav-08);
+  color: var(--ink-soft);
+}
+
+.phase-chip.is-running {
+  background: var(--lav);
+  color: var(--bg);
+}
+
+.phase-chip.is-upcoming {
+  color: var(--lav);
+}
+
+.admin-rejudge-row {
+  grid-template-columns: minmax(12rem, 22rem) max-content;
+  align-items: stretch;
+  margin-bottom: 0.7rem;
+}
+
+@media (max-width: 720px) {
+  .contest-head-side {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scoreboard-table {
+    display: block;
+    overflow-x: auto;
+  }
+}

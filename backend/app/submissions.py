@@ -10,11 +10,12 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user
 from app.config import get_settings
+from app.contests import hidden_problem_ids, running_contest_for
 from app.db import as_utc, get_db
 from app.judge.base import Judge
 from app.judge.types import Language, Verdict
 from app.judging import JudgeWorker
-from app.models import Problem, Submission, User
+from app.models import Contest, Problem, Submission, User
 
 router = APIRouter(prefix="/api", tags=["submissions"])
 
@@ -34,6 +35,19 @@ def get_worker(request: Request) -> JudgeWorker:
 
 def get_judge(request: Request) -> Judge:
     return request.app.state.judge
+
+
+def _contest_access(db: Session, user: User, problem: Problem) -> Contest | None:
+    """404 si le problème appartient à un contest non terminé et que
+    l'utilisateur n'y a pas accès ; sinon, le contest en cours qui donne accès
+    (None pour un problème public)."""
+    now = datetime.now(UTC)
+    if problem.id not in hidden_problem_ids(db, now):
+        return None
+    contest = running_contest_for(db, user, problem.id, now)
+    if contest is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
+    return contest
 
 
 class SubmissionPayload(BaseModel):
@@ -85,6 +99,10 @@ def submit(
     if problem is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
 
+    # Problème de contest : accessible pendant la fenêtre aux seuls inscrits,
+    # et la soumission est alors rattachée au contest (scoreboard).
+    contest = _contest_access(db, user, problem)
+
     # Rate limiting par utilisateur : protège la file et la machine (PLAN.md 1a).
     cooldown = timedelta(seconds=get_settings().submission_cooldown_s)
     last = db.scalar(
@@ -107,6 +125,7 @@ def submit(
     submission = Submission(
         user_id=user.id,
         problem_id=problem.id,
+        contest_id=contest.id if contest else None,
         language=payload.language,
         source_code=payload.source_code,
     )
@@ -176,6 +195,7 @@ async def run_code(
     )
     if problem is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
+    _contest_access(db, user, problem)
 
     now = time.monotonic()
     last = _last_run_at.get(user.id)
@@ -253,6 +273,7 @@ def list_my_submissions(
     problem = db.scalar(select(Problem).where(Problem.slug == slug))
     if problem is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
+    _contest_access(db, user, problem)
     submissions = db.scalars(
         select(Submission)
         .where(Submission.user_id == user.id, Submission.problem_id == problem.id)

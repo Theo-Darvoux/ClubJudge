@@ -36,6 +36,33 @@ Un reverse proxy TLS (Caddy ou nginx sur l'hôte) doit pointer vers
 À mettre en place dès les premiers vrais utilisateurs (Phase 1a) :
 dump PostgreSQL quotidien + test de restauration documenté ici.
 
+## Administration
+
+### Promouvoir un admin
+
+Les rôles se gèrent par CLI (pas d'UI pour ça — volontaire) :
+
+```sh
+docker compose exec backend uv run clubjudge-admin promote alice@exemple.fr
+docker compose exec backend uv run clubjudge-admin demote alice@exemple.fr
+docker compose exec backend uv run clubjudge-admin list
+```
+
+Un admin voit l'onglet **Admin** dans la nav : création/édition de contests
+et outils de rejudge.
+
+### Annonces Discord
+
+Renseigner `DISCORD_WEBHOOK_URL` (variable d'environnement du backend ou
+`.env` à la racine, vide par défaut = annonces désactivées) avec l'URL d'un
+webhook du serveur Discord du club. Annoncés automatiquement : création d'un contest,
+début (avec lien), first bloods pendant la fenêtre, résultats finaux (podium).
+Best-effort : un échec d'envoi est loggé mais ne bloque jamais la plateforme.
+
 ## Rejuger / dépanner
 
-À documenter en Phase 2 (outils admin de rejudge).
+Après correction d'un test ou d'une limite (re-import du contenu), rejuger
+depuis la page **Admin** : par soumission (id) ou par problème (slug, rejuge
+tout). Les soumissions repassent en file ; date et rattachement contest sont
+préservés, donc le scoreboard d'un contest se recalcule tout seul. Un rejudge
+postérieur à la fin d'un contest ne ré-annonce pas de first blood sur Discord.

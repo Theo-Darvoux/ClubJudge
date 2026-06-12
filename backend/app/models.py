@@ -174,6 +174,64 @@ class SkillProblem(Base):
     problem: Mapped[Problem] = relationship()
 
 
+class Contest(Base):
+    """Compétition ICPC : une fenêtre temporelle, un ensemble de problèmes
+    lettrés (A, B, C…), des inscrits. Les problèmes rattachés à un contest non
+    terminé sont cachés de la liste générale ; ils la rejoignent à la fin
+    (upsolving)."""
+
+    __tablename__ = "contests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(128))
+    description: Mapped[str | None] = mapped_column(Text, default=None)
+    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Annonces Discord déjà envoyées (la tâche d'annonce ne les renvoie pas).
+    start_announced: Mapped[bool] = mapped_column(Boolean, default=False)
+    results_announced: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    problems: Mapped[list["ContestProblem"]] = relationship(
+        back_populates="contest", cascade="all, delete-orphan", order_by="ContestProblem.label"
+    )
+    registrations: Mapped[list["ContestRegistration"]] = relationship(
+        back_populates="contest", cascade="all, delete-orphan"
+    )
+
+
+class ContestProblem(Base):
+    __tablename__ = "contest_problems"
+    __table_args__ = (
+        UniqueConstraint("contest_id", "problem_id"),
+        UniqueConstraint("contest_id", "label"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contest_id: Mapped[int] = mapped_column(ForeignKey("contests.id", ondelete="CASCADE"))
+    problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id", ondelete="CASCADE"))
+    label: Mapped[str] = mapped_column(String(2))  # lettre ICPC : A, B, C…
+
+    contest: Mapped[Contest] = relationship(back_populates="problems")
+    problem: Mapped[Problem] = relationship()
+
+
+class ContestRegistration(Base):
+    __tablename__ = "contest_registrations"
+    __table_args__ = (UniqueConstraint("contest_id", "user_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contest_id: Mapped[int] = mapped_column(ForeignKey("contests.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    registered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    contest: Mapped[Contest] = relationship(back_populates="registrations")
+    user: Mapped[User] = relationship()
+
+
 class Submission(Base):
     __tablename__ = "submissions"
     __table_args__ = (Index("ix_submissions_user_problem", "user_id", "problem_id"),)
@@ -181,6 +239,11 @@ class Submission(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id", ondelete="CASCADE"))
+    # Renseigné quand la soumission est faite pendant un contest où
+    # l'utilisateur est inscrit — c'est elle qui alimente le scoreboard.
+    contest_id: Mapped[int | None] = mapped_column(
+        ForeignKey("contests.id", ondelete="SET NULL"), default=None, index=True
+    )
     language: Mapped[str] = mapped_column(String(16))
     source_code: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(16), default=SubmissionStatus.QUEUED, index=True)
@@ -196,3 +259,4 @@ class Submission(Base):
 
     user: Mapped[User] = relationship(back_populates="submissions")
     problem: Mapped[Problem] = relationship()
+    contest: Mapped[Contest | None] = relationship()

@@ -20,6 +20,13 @@ export interface Sample {
   expected_output: string;
 }
 
+export interface ProblemContestRef {
+  slug: string;
+  title: string;
+  label: string;
+  end_at: string;
+}
+
 export interface ProblemDetail extends ProblemSummary {
   statement_fr: string;
   statement_en: string | null;
@@ -28,6 +35,7 @@ export interface ProblemDetail extends ProblemSummary {
   samples: Sample[];
   hints: string[];
   has_editorial: boolean;
+  contest: ProblemContestRef | null;
 }
 
 export interface Editorial {
@@ -68,6 +76,63 @@ export interface SkillNode {
   solved_count: number;
   mastery_threshold: number;
   state: SkillState;
+}
+
+export type ContestPhase = 'upcoming' | 'running' | 'finished';
+
+export interface ContestSummary {
+  slug: string;
+  title: string;
+  phase: ContestPhase;
+  start_at: string;
+  end_at: string;
+  problem_count: number;
+  registered_count: number;
+  registered: boolean;
+}
+
+export interface ContestProblemRef {
+  label: string;
+  slug: string;
+  title: string;
+  difficulty: number;
+  solved: boolean;
+}
+
+export interface ContestDetail extends ContestSummary {
+  description: string | null;
+  problems: ContestProblemRef[] | null;
+}
+
+export interface ScoreCell {
+  tries: number;
+  solved_at_min: number | null;
+  first_blood: boolean;
+  pending: boolean;
+}
+
+export interface ScoreRow {
+  rank: number;
+  display_name: string;
+  is_me: boolean;
+  solved: number;
+  penalty_min: number;
+  cells: ScoreCell[];
+}
+
+export interface Scoreboard {
+  phase: ContestPhase;
+  problems: string[];
+  rows: ScoreRow[];
+}
+
+export interface ContestPayload {
+  slug: string;
+  title: string;
+  description: string | null;
+  start_at: string;
+  end_at: string;
+  problems: { slug: string; label: string }[];
 }
 
 export type SubmissionLanguage = 'cpp' | 'python' | 'c' | 'java';
@@ -186,4 +251,26 @@ export const api = {
     }),
   editorial: (slug: string) => request<Editorial>(`/api/problems/${slug}/editorial`),
   solutions: (slug: string) => request<SharedSolution[]>(`/api/problems/${slug}/solutions`),
+
+  contests: () => request<ContestSummary[]>('/api/contests'),
+  contest: (slug: string) => request<ContestDetail>(`/api/contests/${slug}`),
+  contestRegister: (slug: string) =>
+    request<void>(`/api/contests/${slug}/register`, { method: 'POST' }),
+  contestUnregister: (slug: string) =>
+    request<void>(`/api/contests/${slug}/register`, { method: 'DELETE' }),
+  scoreboard: (slug: string) => request<Scoreboard>(`/api/contests/${slug}/scoreboard`),
+
+  createContest: (payload: ContestPayload) =>
+    request<ContestDetail>('/api/contests', { method: 'POST', body: JSON.stringify(payload) }),
+  updateContest: (slug: string, payload: ContestPayload) =>
+    request<ContestDetail>(`/api/contests/${slug}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteContest: (slug: string) =>
+    request<void>(`/api/contests/${slug}`, { method: 'DELETE' }),
+  rejudgeProblem: (slug: string) =>
+    request<{ rejudged: number }>(`/api/admin/problems/${slug}/rejudge`, { method: 'POST' }),
+  rejudgeSubmission: (id: number) =>
+    request<{ rejudged: number }>(`/api/admin/submissions/${id}/rejudge`, { method: 'POST' }),
 };

@@ -5,21 +5,25 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app import auth, problems, skills, submissions
+from app import admin, auth, contests, problems, skills, submissions
 from app.config import get_settings
 from app.db import engine
 from app.judge import Judge0Judge
 from app.judging import JudgeWorker
+from app.notify import ContestAnnouncer
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     judge = Judge0Judge(get_settings().judge0_url)
     worker = JudgeWorker(judge)
+    announcer = ContestAnnouncer()
     app.state.judge = judge  # exécutions d'essai synchrones (run sur exemples)
     app.state.judge_worker = worker
     await worker.start()
+    await announcer.start()
     yield
+    await announcer.stop()
     await worker.stop()
 
 
@@ -33,7 +37,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(admin.router)
 app.include_router(auth.router)
+app.include_router(contests.router)
 app.include_router(problems.router)
 app.include_router(skills.router)
 app.include_router(submissions.router)

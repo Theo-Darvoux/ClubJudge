@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -7,9 +7,10 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user
-from app.db import get_db
+from app.contests import hidden_problem_ids, running_contest_for
+from app.db import as_utc, get_db
 from app.judge.types import Verdict
-from app.models import Problem, ProblemTag, Submission, User
+from app.models import ContestProblem, Problem, ProblemTag, Submission, User
 
 router = APIRouter(prefix="/api/problems", tags=["problems"])
 
@@ -29,6 +30,15 @@ class SampleOut(BaseModel):
     expected_output: str
 
 
+class ProblemContestRef(BaseModel):
+    """Contest en cours par lequel l'utilisateur accède à ce problème."""
+
+    slug: str
+    title: str
+    label: str
+    end_at: datetime
+
+
 class ProblemDetail(ProblemSummary):
     statement_fr: str
     statement_en: str | None
@@ -37,6 +47,7 @@ class ProblemDetail(ProblemSummary):
     samples: list[SampleOut]
     hints: list[str]
     has_editorial: bool
+    contest: ProblemContestRef | None = None
 
 
 @router.get("")
@@ -51,6 +62,11 @@ def list_problems(
     query = select(Problem).options(selectinload(Problem.tags)).order_by(
         Problem.difficulty, Problem.title
     )
+    # Les problèmes d'un contest non terminé restent secrets ; ils rejoignent
+    # la liste à la fin de la fenêtre (upsolving, PLAN.md Phase 2).
+    hidden = hidden_problem_ids(db, datetime.now(UTC))
+    if hidden:
+        query = query.where(Problem.id.not_in(hidden))
     if category:
         query = query.where(Problem.category == category)
     if difficulty:
@@ -110,6 +126,27 @@ def get_problem(
     if problem is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
 
+    now = datetime.now(UTC)
+    contest_ref: ProblemContestRef | None = None
+    if problem.id in hidden_problem_ids(db, now):
+        contest = running_contest_for(db, user, problem.id, now)
+        if contest is None:
+            # Même 404 qu'un slug inconnu : ne pas révéler l'existence d'un
+            # problème de contest à venir.
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
+        label = db.scalar(
+            select(ContestProblem.label).where(
+                ContestProblem.contest_id == contest.id,
+                ContestProblem.problem_id == problem.id,
+            )
+        )
+        contest_ref = ProblemContestRef(
+            slug=contest.slug,
+            title=contest.title,
+            label=label or "?",
+            end_at=as_utc(contest.end_at),
+        )
+
     verdicts = [
         v for (v,) in db.execute(
             select(Submission.verdict).where(
@@ -134,8 +171,10 @@ def get_problem(
             for t in problem.tests
             if t.is_sample
         ],
-        hints=[h.content_fr for h in problem.hints],
-        has_editorial=problem.editorial_fr is not None,
+        # Pendant un contest, pas d'indices ni d'éditorial : conditions ICPC.
+        hints=[] if contest_ref else [h.content_fr for h in problem.hints],
+        has_editorial=problem.editorial_fr is not None and contest_ref is None,
+        contest=contest_ref,
     )
 
 
@@ -144,6 +183,13 @@ def _get_problem_or_404(db: Session, slug: str) -> Problem:
     if problem is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
     return problem
+
+
+def _require_contest_over(db: Session, problem: Problem) -> None:
+    """Éditorial et solutions des autres restent fermés tant que le problème
+    appartient à un contest non terminé — conditions ICPC, même après son AC."""
+    if problem.id in hidden_problem_ids(db, datetime.now(UTC)):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "contest_running")
 
 
 def _require_own_ac(db: Session, user: User, problem: Problem) -> None:
@@ -176,6 +222,7 @@ def get_editorial(
     problem = _get_problem_or_404(db, slug)
     if problem.editorial_fr is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no_editorial")
+    _require_contest_over(db, problem)
     _require_own_ac(db, user, problem)
     return EditorialOut(editorial_fr=problem.editorial_fr, editorial_en=problem.editorial_en)
 
@@ -198,6 +245,7 @@ def list_solutions(
     user: Annotated[User, Depends(get_current_user)],
 ) -> list[SolutionOut]:
     problem = _get_problem_or_404(db, slug)
+    _require_contest_over(db, problem)
     _require_own_ac(db, user, problem)
 
     accepted = db.scalars(

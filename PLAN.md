@@ -5,7 +5,7 @@ Alternative moderne à DOMJudge, avec trois sections : **liste de problèmes**,
 **compétitions**, **cours avec TP interactifs**.
 
 > Document de référence du projet — mis à jour au fil des décisions.
-> Dernière mise à jour : 2026-06-12.
+> Dernière mise à jour : 2026-06-13.
 
 ## 1. Objectifs et philosophie
 
@@ -190,15 +190,43 @@ Décision du 2026-06-12. Principes :
 ### Phase 2 — Compétitions (ICPC)
 *Objectif : le club peut organiser un contest interne.*
 
-- [ ] Modèle contest : titre, fenêtre temporelle, ensemble de problèmes, inscrits.
-- [ ] Inscription à un contest ; visibilité des problèmes seulement pendant la fenêtre.
-- [ ] Scoring ICPC : classement par problèmes résolus puis pénalité (temps + 20 min/essai raté).
-- [ ] Scoreboard en direct ; page de résultats finale.
-- [ ] Plusieurs contests simultanés ou passés consultables (mode "upsolving" : les problèmes rejoignent la liste générale après le contest).
-- [ ] First blood par problème, mis en avant sur le scoreboard (les « ballons » ICPC).
-- [ ] Webhook Discord : annonce de contest (création, rappel, début), first bloods, résultats.
-- [ ] Outils admin minimaux : rejudge d'une soumission/d'un problème.
+- [x] Modèle contest : titre, fenêtre temporelle, ensemble de problèmes, inscrits.
+      *(Tables `contests`/`contest_problems` (labels A, B, C…)/`contest_registrations`,
+      migration 0005 ; `Submission.contest_id` posé à la soumission si l'utilisateur
+      est inscrit à un contest en cours contenant le problème.)*
+- [x] Inscription à un contest ; visibilité des problèmes seulement pendant la fenêtre.
+      *(Un problème rattaché à un contest non terminé est invisible partout — même 404
+      qu'un slug inconnu, pour ne rien révéler ; pendant la fenêtre, seuls les inscrits
+      y accèdent. Inscription possible jusqu'à la fin (rejoindre en cours de route OK),
+      désinscription seulement avant le début. Conditions ICPC : indices, éditorial et
+      solutions des autres fermés pendant la fenêtre, côté API et côté front.)*
+- [x] Scoring ICPC : classement par problèmes résolus puis pénalité (temps + 20 min/essai raté).
+      *(Fonction pure `compute_scores` testée sans BDD ; CE et erreurs internes ne
+      coûtent rien ; soumissions après le premier AC ignorées ; rangs partagés sur
+      égalité parfaite, départage par dernier AC comme DOMJudge.)*
+- [x] Scoreboard en direct ; page de résultats finale.
+      *(Rafraîchi toutes les 15 s pendant la fenêtre ; cellules ✦/essais/minute,
+      ligne de l'utilisateur surlignée ; « Classement final » après la fin.)*
+- [x] Plusieurs contests simultanés ou passés consultables (mode "upsolving" : les problèmes rejoignent la liste générale après le contest).
+- [x] First blood par problème, mis en avant sur le scoreboard (les « ballons » ICPC).
+      *(✦ lavande sur le scoreboard ; détecté par le worker de jugement à l'AC,
+      annoncé sur Discord si le contest est encore en cours — un rejudge tardif
+      ne ré-annonce pas.)*
+- [x] Webhook Discord : annonce de contest (création, rappel, début), first bloods, résultats.
+      *(`discord_webhook_url` dans la config, embeds lavande, best-effort — un échec
+      est loggé, jamais bloquant. Création annoncée à la volée ; début et résultats
+      (podium 🥇🥈🥉) par la boucle `ContestAnnouncer` (tick 30 s, dédup en base).
+      Le « rappel » avant le début n'est pas implémenté — à brancher si le besoin
+      émerge avant le premier vrai contest.)*
+- [x] Outils admin minimaux : rejudge d'une soumission/d'un problème.
+      *(Rôle admin requis (premier admin promu via la CLI `clubjudge-admin
+      promote|demote|list`) ; page Admin : création/édition/suppression de contests
+      (slug définitif, suppression seulement avant le début) + rejudge ; le rejudge
+      remet la soumission en file en préservant date et contest, le scoreboard se
+      recalcule tout seul.)*
 - 🎯 **Jalon : premier contest du club hébergé sur ClubJudge.**
+  ✓ mécanique en place et testée de bout en bout en local (2026-06-12) —
+  reste à tenir le premier vrai contest (après déploiement).
 
 ### Phase 3 — Cours et TP interactifs
 *Objectif : les nouveaux membres se forment en autonomie.*

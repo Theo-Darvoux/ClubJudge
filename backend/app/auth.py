@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import as_utc, get_db
-from app.models import User, UserSession
+from app.models import Role, User, UserSession
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -62,6 +62,15 @@ def get_current_user(request: Request, db: Annotated[Session, Depends(get_db)]) 
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def require_admin(user: CurrentUser) -> User:
+    if user.role != Role.ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin_only")
+    return user
+
+
+AdminUser = Annotated[User, Depends(require_admin)]
 
 
 class RegisterPayload(BaseModel):

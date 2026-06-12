@@ -12,10 +12,11 @@ from datetime import UTC, datetime
 import httpx
 from sqlalchemy import select
 
-from app.db import SessionLocal
+from app import notify
+from app.db import SessionLocal, as_utc
 from app.judge.base import Judge
 from app.judge.types import Language, TestCase, Verdict
-from app.models import Submission, SubmissionStatus
+from app.models import Contest, ContestProblem, Submission, SubmissionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -123,3 +124,41 @@ class JudgeWorker:
             submission.failed_test = failed_test
             submission.judged_at = datetime.now(UTC)
             db.commit()
+
+        if result.verdict is Verdict.ACCEPTED:
+            await self._maybe_first_blood(submission_id)
+
+    async def _maybe_first_blood(self, submission_id: int) -> None:
+        """Annonce Discord du premier AC d'un problème de contest (le « ballon »
+        ICPC). Détection au jugement, sur la date de soumission ; le contest
+        doit encore être en cours (un rejudge a posteriori ne ré-annonce pas)."""
+        with self._session_factory() as db:
+            submission = db.get(Submission, submission_id)
+            if submission is None or submission.contest_id is None:
+                return
+            contest = db.get(Contest, submission.contest_id)
+            if contest is None or as_utc(contest.end_at) <= datetime.now(UTC):
+                return
+            earlier = db.scalar(
+                select(Submission.id)
+                .where(
+                    Submission.contest_id == submission.contest_id,
+                    Submission.problem_id == submission.problem_id,
+                    Submission.verdict == Verdict.ACCEPTED,
+                    Submission.id != submission.id,
+                    Submission.created_at <= submission.created_at,
+                )
+                .limit(1)
+            )
+            if earlier is not None:
+                return
+            label = db.scalar(
+                select(ContestProblem.label).where(
+                    ContestProblem.contest_id == contest.id,
+                    ContestProblem.problem_id == submission.problem_id,
+                )
+            )
+            contest_title = contest.title
+            problem_title = submission.problem.title
+            member = submission.user.display_name
+        await notify.first_blood(contest_title, label or "?", problem_title, member)
