@@ -8,7 +8,6 @@ export const en: typeof fr = {
     problems: 'Problems',
     contests: 'Contests',
     courses: 'Courses',
-    soon: 'soon',
     logout: 'Sign out',
   },
   lang: {
@@ -70,6 +69,24 @@ export const en: typeof fr = {
       'The skill tree is not defined yet (content/skills.yaml). ' +
       'The problem list is still available.',
     loading: 'loading…',
+    articles: 'Learn',
+  },
+  courses: {
+    title: 'Courses',
+    overline: 'Learn',
+    loading: 'loading…',
+    empty: 'No courses yet — the first ones arrive with the new school year.',
+    back: 'All courses',
+    read_progress: (n: number, m: number) => `${n}/${m} article${m > 1 ? 's' : ''} read`,
+    tp_progress: (n: number, m: number) => `${n}/${m} exercise${m > 1 ? 's' : ''} solved`,
+    read_badge: 'Read',
+    continue_here: 'Continue here',
+    mark_read: 'Mark as read',
+    practice_title: 'Practice',
+    tp_label: 'Exercise',
+    tp_unavailable: 'This problem is temporarily unavailable (it is part of a running contest).',
+    tp_open_problem: 'Open the problem page →',
+    fallback_fr: 'This article is only available in French for now.',
   },
   contests: {
     title: 'Contests',
@@ -169,6 +186,7 @@ export const en: typeof fr = {
   problem: {
     time_limit: 'Time',
     memory_limit: 'Memory',
+    covered_by: '📖 This topic is covered in:',
     statement_fallback_fr: 'Statement only available in French for now.',
     editor_title: 'Your solution',
     language: 'Language',

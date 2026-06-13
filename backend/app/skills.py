@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth import get_current_user
 from app.db import get_db
 from app.judge.types import Verdict
-from app.models import Skill, SkillProblem, Submission, User
+from app.models import CourseArticle, Skill, SkillArticle, SkillProblem, Submission, User
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
@@ -26,6 +26,15 @@ class SkillProblemOut(BaseModel):
     title: str
     difficulty: int
     solved: bool
+
+
+class SkillArticleOut(BaseModel):
+    """Article de cours qui couvre la compétence (skills.yaml, clé `articles`)."""
+
+    course_slug: str
+    article_slug: str
+    title_fr: str
+    title_en: str | None
 
 
 class SkillNodeOut(BaseModel):
@@ -41,6 +50,7 @@ class SkillNodeOut(BaseModel):
     solved_count: int
     mastery_threshold: int
     state: SkillState
+    articles: list[SkillArticleOut]
 
 
 @router.get("/tree")
@@ -52,6 +62,9 @@ def get_tree(
         select(Skill).options(
             selectinload(Skill.prerequisites),
             selectinload(Skill.problems).selectinload(SkillProblem.problem),
+            selectinload(Skill.articles)
+            .selectinload(SkillArticle.article)
+            .selectinload(CourseArticle.course),
         )
     ).all()
     by_id = {s.id: s for s in skills}
@@ -99,6 +112,15 @@ def get_tree(
             solved_count=solved_count[s.id],
             mastery_threshold=s.mastery_threshold,
             state=state_of(s),
+            articles=[
+                SkillArticleOut(
+                    course_slug=sa.article.course.slug,
+                    article_slug=sa.article.slug,
+                    title_fr=sa.article.title_fr,
+                    title_en=sa.article.title_en,
+                )
+                for sa in s.articles
+            ],
         )
         for s in skills
     ]

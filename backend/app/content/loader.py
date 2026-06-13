@@ -1,8 +1,9 @@
 """Lecture et validation de format du dépôt de contenu.
 
-Problèmes (content/problems/<slug>/) et arbre de compétences (content/skills.yaml).
-Format défini dans PLAN.md §3 et §Phase 1.5. Toute erreur lève ContentError avec
-un message actionnable pour l'auteur (affiché par la CLI et la CI).
+Problèmes (content/problems/<slug>/), cours (content/courses/<slug>/) et arbre
+de compétences (content/skills.yaml). Format défini dans PLAN.md §3, §Phase 1.5
+et §Phase 3. Toute erreur lève ContentError avec un message actionnable pour
+l'auteur (affiché par la CLI et la CI).
 """
 
 import math
@@ -163,6 +164,174 @@ def discover_problems(content_dir: Path) -> list[Path]:
     return sorted(p for p in problems_dir.iterdir() if p.is_dir())
 
 
+# Article : `NN-slug.fr.md` — l'ordre vient du préfixe numérique (pas de liste
+# d'ordre dans course.yaml : une seule source de vérité). `.en.md` optionnel.
+ARTICLE_FILE_RE = re.compile(r"^(\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.fr\.md$")
+# Bloc TP dans le corps d'un article : un fence ```tp contenant le slug du
+# problème lié — rendu côté front comme éditeur + juge embarqués.
+TP_BLOCK_RE = re.compile(r"^```tp\s*\n\s*([a-z0-9-]+)\s*\n```\s*$", re.MULTILINE)
+FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+TITLE_RE = re.compile(r"\A\s*#\s+(.+?)\s*$", re.MULTILINE)
+
+
+@dataclass
+class LoadedArticle:
+    slug: str
+    position: int
+    title_fr: str
+    title_en: str | None
+    body_fr: str
+    body_en: str | None
+    # Slugs des problèmes liés, dans l'ordre d'apparition.
+    tp_problems: list[str] = field(default_factory=list)
+    practice: list[str] = field(default_factory=list)
+
+
+@dataclass
+class LoadedCourse:
+    slug: str
+    title: str
+    category: str
+    description: str | None
+    position: int
+    articles: list[LoadedArticle] = field(default_factory=list)
+
+
+def extract_tp_slugs(body: str) -> list[str]:
+    return TP_BLOCK_RE.findall(body)
+
+
+def _parse_article_md(path: Path) -> tuple[dict, str, str]:
+    """Retourne (frontmatter, titre, corps sans le titre). Le fichier commence
+    par un frontmatter YAML optionnel puis un titre `# …` obligatoire."""
+    raw = path.read_text()
+    meta: dict = {}
+    fm = FRONTMATTER_RE.match(raw)
+    if fm:
+        parsed = yaml.safe_load(fm.group(1))
+        _require(isinstance(parsed, dict), path, "le frontmatter doit être un mapping YAML")
+        meta = parsed
+        raw = raw[fm.end():]
+    title_match = TITLE_RE.match(raw)
+    _require(title_match is not None, path,
+             "l'article doit commencer par un titre de niveau 1 (`# Titre`)")
+    assert title_match is not None
+    body = raw[title_match.end():].strip()
+    _require(body != "", path, "l'article est vide après son titre")
+    return meta, title_match.group(1), body
+
+
+def load_course(course_dir: Path, problem_slugs: set[str]) -> LoadedCourse:
+    slug = course_dir.name
+    _require(SLUG_RE.match(slug) is not None, course_dir,
+             "le nom du dossier doit être un slug (minuscules, chiffres, tirets)")
+
+    meta_path = course_dir / "course.yaml"
+    _require(meta_path.is_file(), meta_path, "fichier course.yaml manquant")
+    meta = yaml.safe_load(meta_path.read_text())
+    _require(isinstance(meta, dict), meta_path, "course.yaml doit être un mapping YAML")
+    for key in ("title", "category"):
+        _require(
+            isinstance(meta.get(key), str) and meta[key].strip() != "",
+            meta_path, f"champ obligatoire manquant : {key}",
+        )
+    position = meta.get("position", 0)
+    _require(isinstance(position, int), meta_path,
+             "position doit être un entier (ordre dans la catégorie)")
+    description = meta.get("description")
+    _require(description is None or (isinstance(description, str) and description.strip() != ""),
+             meta_path, "description doit être une chaîne non vide si présente")
+
+    article_paths = sorted(course_dir.glob("*.fr.md"))
+    _require(len(article_paths) >= 1, course_dir,
+             "au moins un article requis (NN-slug.fr.md, ex. 01-introduction.fr.md)")
+
+    articles: list[LoadedArticle] = []
+    seen_slugs: set[str] = set()
+    seen_positions: set[int] = set()
+    for path in article_paths:
+        match = ARTICLE_FILE_RE.match(path.name)
+        _require(match is not None, path,
+                 "nom d'article invalide : attendu NN-slug.fr.md (le préfixe "
+                 "numérique fixe l'ordre dans le cours)")
+        assert match is not None
+        article_pos, article_slug = int(match.group(1)), match.group(2)
+        _require(article_slug not in seen_slugs, path, "slug d'article en double")
+        _require(article_pos not in seen_positions, path,
+                 f"préfixe {match.group(1)} déjà utilisé par un autre article")
+        seen_slugs.add(article_slug)
+        seen_positions.add(article_pos)
+
+        fm, title_fr, body_fr = _parse_article_md(path)
+
+        practice = fm.get("practice", [])
+        _require(isinstance(practice, list) and all(isinstance(p, str) for p in practice),
+                 path, "frontmatter : `practice` doit être une liste de slugs de problèmes")
+        _require(len(set(practice)) == len(practice), path,
+                 "frontmatter : slugs en double dans `practice`")
+        unknown = [p for p in practice if p not in problem_slugs]
+        _require(not unknown, path, f"`practice` : problème(s) inconnu(s) : {unknown}")
+        for key in fm:
+            _require(key == "practice", path, f"clé de frontmatter inconnue : {key}")
+
+        tp_problems = extract_tp_slugs(body_fr)
+        _require(len(set(tp_problems)) == len(tp_problems), path,
+                 "un même problème apparaît dans plusieurs blocs TP")
+        unknown = [p for p in tp_problems if p not in problem_slugs]
+        _require(not unknown, path, f"bloc(s) TP : problème(s) inconnu(s) : {unknown}")
+        overlap = sorted(set(tp_problems) & set(practice))
+        _require(not overlap, path,
+                 f"problème(s) à la fois en bloc TP et dans `practice` : {overlap}")
+
+        en_path = path.with_name(path.name.replace(".fr.md", ".en.md"))
+        title_en: str | None = None
+        body_en: str | None = None
+        if en_path.is_file():
+            _, title_en, body_en = _parse_article_md(en_path)
+            unknown = [p for p in extract_tp_slugs(body_en) if p not in problem_slugs]
+            _require(not unknown, en_path, f"bloc(s) TP : problème(s) inconnu(s) : {unknown}")
+
+        articles.append(LoadedArticle(
+            slug=article_slug,
+            position=article_pos,
+            title_fr=title_fr,
+            title_en=title_en,
+            body_fr=body_fr,
+            body_en=body_en,
+            tp_problems=tp_problems,
+            practice=practice,
+        ))
+
+    orphan_en = [
+        p.name for p in sorted(course_dir.glob("*.en.md"))
+        if not p.with_name(p.name.replace(".en.md", ".fr.md")).is_file()
+    ]
+    _require(not orphan_en, course_dir,
+             f"article(s) .en.md sans .fr.md (le français est la langue de référence) : "
+             f"{orphan_en}")
+
+    return LoadedCourse(
+        slug=slug,
+        title=str(meta["title"]).strip(),
+        category=str(meta["category"]).strip(),
+        description=description.strip() if description else None,
+        position=position,
+        articles=articles,
+    )
+
+
+def discover_courses(content_dir: Path) -> list[Path]:
+    courses_dir = content_dir / "courses"
+    if not courses_dir.is_dir():
+        return []
+    return sorted(p for p in courses_dir.iterdir() if p.is_dir())
+
+
+def article_refs(courses: list[LoadedCourse]) -> set[str]:
+    """Références `cours/article` utilisables par skills.yaml (clé `articles`)."""
+    return {f"{c.slug}/{a.slug}" for c in courses for a in c.articles}
+
+
 @dataclass
 class LoadedSkill:
     id: str
@@ -175,6 +344,8 @@ class LoadedSkill:
     requires: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
     mastery: int = 1
+    # Références `cours/article` vers les articles qui couvrent la compétence.
+    articles: list[str] = field(default_factory=list)
 
 
 def default_mastery(problem_count: int) -> int:
@@ -203,10 +374,15 @@ def _check_acyclic(skills: dict[str, LoadedSkill], path: Path) -> None:
             visit(skill_id, [])
 
 
-def load_skills(content_dir: Path, problem_slugs: set[str]) -> list[LoadedSkill]:
-    """Charge et valide content/skills.yaml. `problem_slugs` est l'ensemble des
-    problèmes connus du contexte d'appel (dossiers du dépôt pour la CLI, base
-    pour l'import). Retourne [] si le fichier n'existe pas (arbre optionnel)."""
+def load_skills(
+    content_dir: Path,
+    problem_slugs: set[str],
+    known_articles: set[str] = frozenset(),
+) -> list[LoadedSkill]:
+    """Charge et valide content/skills.yaml. `problem_slugs` et `known_articles`
+    (références `cours/article`) sont les contenus connus du contexte d'appel
+    (dossiers du dépôt pour la CLI, base pour l'import). Retourne [] si le
+    fichier n'existe pas (arbre optionnel)."""
     path = content_dir / "skills.yaml"
     if not path.is_file():
         return []
@@ -262,6 +438,15 @@ def load_skills(content_dir: Path, problem_slugs: set[str]) -> list[LoadedSkill]
             _require(value is None or (isinstance(value, str) and value.strip() != ""),
                      path, f"{where} : `{key}` doit être une chaîne non vide si présent")
 
+        articles = node.get("articles", [])
+        _require(isinstance(articles, list) and all(isinstance(a, str) for a in articles),
+                 path, f"{where} : `articles` doit être une liste de références "
+                       "`slug-du-cours/slug-de-l-article`")
+        _require(len(set(articles)) == len(articles), path,
+                 f"{where} : références d'articles en double")
+        unknown = [a for a in articles if a not in known_articles]
+        _require(not unknown, path, f"{where} : article(s) inconnu(s) : {unknown}")
+
         skills[skill_id] = LoadedSkill(
             id=skill_id,
             name_fr=name.strip(),
@@ -273,6 +458,7 @@ def load_skills(content_dir: Path, problem_slugs: set[str]) -> list[LoadedSkill]
             requires=requires,
             problems=problems,
             mastery=mastery,
+            articles=articles,
         )
 
     for skill in skills.values():

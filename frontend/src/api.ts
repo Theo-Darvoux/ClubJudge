@@ -27,6 +27,13 @@ export interface ProblemContestRef {
   end_at: string;
 }
 
+export interface ArticleRef {
+  course_slug: string;
+  article_slug: string;
+  title_fr: string;
+  title_en: string | null;
+}
+
 export interface ProblemDetail extends ProblemSummary {
   statement_fr: string;
   statement_en: string | null;
@@ -36,6 +43,7 @@ export interface ProblemDetail extends ProblemSummary {
   hints: string[];
   has_editorial: boolean;
   contest: ProblemContestRef | null;
+  articles: ArticleRef[];
 }
 
 export interface Editorial {
@@ -76,6 +84,58 @@ export interface SkillNode {
   solved_count: number;
   mastery_threshold: number;
   state: SkillState;
+  articles: ArticleRef[];
+}
+
+export interface CourseSummary {
+  slug: string;
+  title: string;
+  category: string;
+  description: string | null;
+  article_count: number;
+  read_count: number;
+  tp_total: number;
+  tp_solved: number;
+}
+
+export interface ArticleSummary {
+  slug: string;
+  title_fr: string;
+  title_en: string | null;
+  read: boolean;
+  tp_total: number;
+  tp_solved: number;
+}
+
+export interface CourseDetail extends CourseSummary {
+  articles: ArticleSummary[];
+}
+
+export interface ArticleNeighbor {
+  slug: string;
+  title_fr: string;
+  title_en: string | null;
+}
+
+export interface ArticleProblemRef {
+  slug: string;
+  title: string;
+  difficulty: number;
+  solved: boolean;
+}
+
+export interface ArticleDetail {
+  slug: string;
+  title_fr: string;
+  title_en: string | null;
+  body_fr: string;
+  body_en: string | null;
+  read: boolean;
+  course_slug: string;
+  course_title: string;
+  practice: ArticleProblemRef[];
+  prev: ArticleNeighbor | null;
+  next: ArticleNeighbor | null;
 }
 
 export type ContestPhase = 'upcoming' | 'running' | 'finished';
@@ -251,6 +311,13 @@ export const api = {
     }),
   editorial: (slug: string) => request<Editorial>(`/api/problems/${slug}/editorial`),
   solutions: (slug: string) => request<SharedSolution[]>(`/api/problems/${slug}/solutions`),
+
+  courses: () => request<CourseSummary[]>('/api/courses'),
+  course: (slug: string) => request<CourseDetail>(`/api/courses/${slug}`),
+  article: (courseSlug: string, articleSlug: string) =>
+    request<ArticleDetail>(`/api/courses/${courseSlug}/articles/${articleSlug}`),
+  markArticleRead: (courseSlug: string, articleSlug: string) =>
+    request<void>(`/api/courses/${courseSlug}/articles/${articleSlug}/read`, { method: 'POST' }),
 
   contests: () => request<ContestSummary[]>('/api/contests'),
   contest: (slug: string) => request<ContestDetail>(`/api/contests/${slug}`),

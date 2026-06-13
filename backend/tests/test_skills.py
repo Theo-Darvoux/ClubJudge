@@ -5,8 +5,11 @@ import pytest
 from app.content.importer import sync_skills
 from app.content.loader import (
     ContentError,
+    article_refs,
     default_mastery,
+    discover_courses,
     discover_problems,
+    load_course,
     load_skills,
 )
 from app.models import Problem, ProblemTest, Skill, Submission
@@ -199,5 +202,6 @@ def test_tree_requires_auth(client):
 def test_repo_skills_yaml_is_valid():
     """L'arbre réel du dépôt doit toujours passer la validation de format."""
     slugs = {p.name for p in discover_problems(CONTENT_DIR)}
-    skills = load_skills(CONTENT_DIR, slugs)
+    courses = [load_course(c, slugs) for c in discover_courses(CONTENT_DIR)]
+    skills = load_skills(CONTENT_DIR, slugs, article_refs(courses))
     assert len(skills) >= 3

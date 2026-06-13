@@ -5,7 +5,7 @@ Alternative moderne à DOMJudge, avec trois sections : **liste de problèmes**,
 **compétitions**, **cours avec TP interactifs**.
 
 > Document de référence du projet — mis à jour au fil des décisions.
-> Dernière mise à jour : 2026-06-13.
+> Dernière mise à jour : 2026-06-13 (Phase 3 livrée).
 
 ## 1. Objectifs et philosophie
 
@@ -178,8 +178,10 @@ Décision du 2026-06-12. Principes :
       lavande, pas prêt en pointillés ; panneau latéral avec problèmes et prérequis ;
       l'arbre est l'accueil de la section, la liste reste en `/problems/list`. Le nœud
       recommandé est pré-sélectionné à l'arrivée — la réponse à « je travaille quoi ? ».)*
-- [ ] Liens des nœuds vers les articles de cours correspondants (en attente de la
-      Phase 3 — il n'y a pas encore d'articles à lier).
+- [x] Liens des nœuds vers les articles de cours correspondants. *(Fait avec la
+      Phase 3 : clé `articles` optionnelle des nœuds de skills.yaml, références
+      `cours/article` validées à l'import, affichées « Pour apprendre » dans le
+      panneau latéral de l'arbre.)*
 - ⚠️ **Chemin critique éditorial, pas technique** : découper le programme du club
   en compétences et prérequis sensés — à faire collectivement au club.
   *(L'arbre actuel — 4 nœuds, 5 problèmes — est un brouillon d'amorçage marqué
@@ -231,12 +233,38 @@ Décision du 2026-06-12. Principes :
 ### Phase 3 — Cours et TP interactifs
 *Objectif : les nouveaux membres se forment en autonomie.*
 
-- [ ] Modèle et import des cours/articles depuis le dépôt de contenu, organisés par catégorie.
-- [ ] Rendu des articles (Markdown, LaTeX, coloration syntaxique des extraits de code).
-- [ ] Blocs TP interactifs dans les articles : éditeur + exécution contre les tests d'un problème lié, sans quitter la page.
-- [ ] Liens croisés : un article référence des problèmes de la liste ("pour pratiquer : …"), une page problème peut pointer vers l'article qui couvre la notion.
-- [ ] Suivi de progression simple (articles lus, TP réussis).
+- [x] Modèle et import des cours/articles depuis le dépôt de contenu, organisés par catégorie.
+      *(`content/courses/<slug>/` : `course.yaml` (titre, catégorie, description,
+      position) + articles `NN-slug.fr.md` — l'ordre vient du préfixe numérique,
+      pas de liste à maintenir dans course.yaml ; traduction optionnelle en
+      `NN-slug.en.md`. Un article = frontmatter YAML optionnel (`practice:`)
+      puis titre `# …` obligatoire. Synchronisation par upsert (migration 0006) :
+      les marques de lecture survivent aux mises à jour du contenu. Format
+      documenté dans `content/README.md`.)*
+- [x] Rendu des articles (Markdown, LaTeX, coloration syntaxique des extraits de code).
+      *(Composant `Markdown` commun aux énoncés et aux articles : GFM + KaTeX +
+      rehype-highlight, thème de coloration maison accordé à la DA.)*
+- [x] Blocs TP interactifs dans les articles : éditeur + exécution contre les tests d'un problème lié, sans quitter la page.
+      *(Fence ` ```tp ` contenant le slug du problème, validé à l'import. Le poste
+      de travail complet de la page problème a été extrait en composant
+      `Workbench` réutilisé par les deux ; le code écrit dans un TP et sur la page
+      problème est partagé (même localStorage). Énoncé repliable, replié une fois
+      le TP résolu. Un problème de contest non terminé reste secret : TP
+      « indisponible » et absent de « pour pratiquer ».)*
+- [x] Liens croisés : un article référence des problèmes de la liste ("pour pratiquer : …"), une page problème peut pointer vers l'article qui couvre la notion.
+      *(`practice:` du frontmatter → panneau « Pour pratiquer » en fin d'article ;
+      en sens inverse la page problème affiche « la notion est couverte dans … »
+      — masqué pendant un contest, conditions ICPC. Et les nœuds de l'arbre de
+      compétences pointent vers leurs articles, cf. Phase 1.5.)*
+- [x] Suivi de progression simple (articles lus, TP réussis).
+      *(« Marquer comme lu » explicite en fin d'article (table article_reads) ;
+      TP réussis calculés depuis les soumissions comme partout. Progression
+      affichée sur les cartes de cours, le sommaire et chaque article ; le
+      sommaire signale « reprendre ici » sur le premier article non lu.)*
 - 🎯 **Jalon : un parcours d'intro complet (articles + TP) pour la rentrée des nouveaux.**
+  ✓ mécanique en place, testée de bout en bout en local (2026-06-13) avec un
+  premier cours de 3 articles (« Bien démarrer ») — étoffer le contenu avec le
+  club avant la rentrée.
 
 ### Phase 4 — Extensions
 

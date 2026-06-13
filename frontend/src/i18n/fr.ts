@@ -6,7 +6,6 @@ export const fr = {
     problems: 'Problèmes',
     contests: 'Compétitions',
     courses: 'Cours',
-    soon: 'bientôt',
     logout: 'Déconnexion',
   },
   lang: {
@@ -69,6 +68,26 @@ export const fr = {
       "L'arbre de compétences n'est pas encore défini (content/skills.yaml). " +
       'La liste des problèmes reste disponible.',
     loading: 'chargement…',
+    articles: 'Pour apprendre',
+  },
+  courses: {
+    title: 'Cours',
+    overline: 'Se former',
+    loading: 'chargement…',
+    empty: 'Aucun cours pour le moment — les premiers arrivent avec la rentrée.',
+    back: 'Tous les cours',
+    read_progress: (n: number, m: number) =>
+      `${n}/${m} article${m > 1 ? 's' : ''} lu${m > 1 ? 's' : ''}`,
+    tp_progress: (n: number, m: number) => `${n}/${m} TP réussi${m > 1 ? 's' : ''}`,
+    read_badge: 'Lu',
+    continue_here: 'Reprendre ici',
+    mark_read: 'Marquer comme lu',
+    practice_title: 'Pour pratiquer',
+    tp_label: 'TP',
+    tp_unavailable:
+      'Ce problème est momentanément indisponible (il fait partie d’un contest en cours).',
+    tp_open_problem: 'Ouvrir la page du problème →',
+    fallback_fr: 'Article disponible en français uniquement pour le moment.',
   },
   contests: {
     title: 'Compétitions',
@@ -169,6 +188,7 @@ export const fr = {
   problem: {
     time_limit: 'Temps',
     memory_limit: 'Mémoire',
+    covered_by: '📖 La notion est couverte dans :',
     statement_fallback_fr: 'Énoncé disponible en français uniquement pour le moment.',
     editor_title: 'Votre solution',
     language: 'Langage',

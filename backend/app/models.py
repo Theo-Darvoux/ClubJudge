@@ -145,6 +145,9 @@ class Skill(Base):
     problems: Mapped[list["SkillProblem"]] = relationship(
         back_populates="skill", cascade="all, delete-orphan", order_by="SkillProblem.position"
     )
+    articles: Mapped[list["SkillArticle"]] = relationship(
+        back_populates="skill", cascade="all, delete-orphan", order_by="SkillArticle.position"
+    )
 
 
 class SkillPrerequisite(Base):
@@ -172,6 +175,107 @@ class SkillProblem(Base):
 
     skill: Mapped[Skill] = relationship(back_populates="problems")
     problem: Mapped[Problem] = relationship()
+
+
+class Course(Base):
+    """Cours (content/courses/<slug>/) : une suite ordonnée d'articles dans une
+    catégorie. Synchronisé à l'import par upsert (les marques de lecture des
+    membres survivent à une mise à jour du contenu)."""
+
+    __tablename__ = "courses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(128))
+    category: Mapped[str] = mapped_column(String(64), index=True)
+    description: Mapped[str | None] = mapped_column(Text, default=None)
+    # Ordre d'affichage dans la catégorie (course.yaml, défaut 0 puis titre).
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    imported_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    articles: Mapped[list["CourseArticle"]] = relationship(
+        back_populates="course", cascade="all, delete-orphan", order_by="CourseArticle.position"
+    )
+
+
+class CourseArticle(Base):
+    __tablename__ = "course_articles"
+    __table_args__ = (
+        UniqueConstraint("course_id", "slug"),
+        UniqueConstraint("course_id", "position"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
+    slug: Mapped[str] = mapped_column(String(64), index=True)
+    position: Mapped[int] = mapped_column(Integer)  # préfixe NN- du nom de fichier
+    title_fr: Mapped[str] = mapped_column(String(128))
+    title_en: Mapped[str | None] = mapped_column(String(128), default=None)
+    body_fr: Mapped[str] = mapped_column(Text)
+    body_en: Mapped[str | None] = mapped_column(Text, default=None)
+
+    course: Mapped[Course] = relationship(back_populates="articles")
+    problems: Mapped[list["ArticleProblem"]] = relationship(
+        back_populates="article", cascade="all, delete-orphan", order_by="ArticleProblem.position"
+    )
+
+
+class ArticleProblemKind(StrEnum):
+    TP = "tp"  # bloc TP interactif dans le corps de l'article
+    PRACTICE = "practice"  # « pour pratiquer » (frontmatter de l'article)
+
+
+class ArticleProblem(Base):
+    __tablename__ = "article_problems"
+    __table_args__ = (UniqueConstraint("article_id", "problem_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("course_articles.id", ondelete="CASCADE")
+    )
+    problem_id: Mapped[int] = mapped_column(
+        ForeignKey("problems.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    position: Mapped[int] = mapped_column(Integer)
+
+    article: Mapped[CourseArticle] = relationship(back_populates="problems")
+    problem: Mapped[Problem] = relationship()
+
+
+class ArticleRead(Base):
+    """Marque « article lu » par membre — le suivi de progression des cours
+    (les TP réussis, eux, se calculent depuis les soumissions)."""
+
+    __tablename__ = "article_reads"
+    __table_args__ = (UniqueConstraint("user_id", "article_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("course_articles.id", ondelete="CASCADE"), index=True
+    )
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SkillArticle(Base):
+    """Lien d'un nœud de l'arbre de compétences vers un article de cours
+    (clé `articles` de skills.yaml — reliquat de la Phase 1.5)."""
+
+    __tablename__ = "skill_articles"
+    __table_args__ = (UniqueConstraint("skill_id", "article_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    skill_id: Mapped[int] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("course_articles.id", ondelete="CASCADE")
+    )
+    position: Mapped[int] = mapped_column(Integer)
+
+    skill: Mapped["Skill"] = relationship(back_populates="articles")
+    article: Mapped[CourseArticle] = relationship()
 
 
 class Contest(Base):

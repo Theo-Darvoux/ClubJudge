@@ -1847,3 +1847,418 @@ select {
     overflow-x: auto;
   }
 }
+
+/* ---- Cours (Phase 3) --------------------------------------------------- */
+
+.course-category {
+  margin-bottom: 2.4rem;
+}
+
+.category-label {
+  color: var(--lav-soft);
+  letter-spacing: 0.22em;
+  margin-bottom: 1rem;
+}
+
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+  gap: 1.2rem;
+}
+
+.course-card {
+  text-decoration: none;
+  transition: transform 0.18s var(--ease-out), background 0.18s;
+}
+
+.course-card:hover {
+  transform: translateY(-2px);
+  --p-line: var(--lav-25);
+}
+
+.course-card .panel-inner {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1.4rem 1.5rem;
+}
+
+.course-card h3 {
+  font-size: 1.15rem;
+}
+
+.course-desc {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.course-progress {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.progress-track {
+  height: 3px;
+  background: var(--lav-08);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--lav);
+  transition: width 0.3s var(--ease-out);
+}
+
+/* Sommaire d'un cours */
+
+.course-head-progress {
+  margin-top: 0.6rem;
+  color: var(--ink-dim);
+}
+
+.course-page .page-head {
+  display: block;
+}
+
+.course-page .course-desc {
+  max-width: 42rem;
+  margin-top: 0.5rem;
+}
+
+.article-list {
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+  max-width: 46rem;
+}
+
+.article-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--line-soft);
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.article-row:hover {
+  background: var(--lav-08);
+  border-color: var(--lav-25);
+}
+
+.article-row .solved-badge,
+.article-row .next-chip {
+  margin-left: auto;
+}
+
+.article-row .article-tp {
+  color: var(--ink-dim);
+}
+
+.article-row.is-read .article-title {
+  color: var(--ink-soft);
+}
+
+.article-index {
+  color: var(--lav-soft);
+}
+
+.article-title {
+  font-weight: 500;
+}
+
+.next-chip {
+  color: var(--lav);
+  background: var(--lav-14);
+}
+
+/* Page article */
+
+.article-page {
+  display: grid;
+  justify-content: center;
+}
+
+.article-body {
+  max-width: 46rem;
+  width: 100%;
+}
+
+.article-body .page-head {
+  display: block;
+  margin-bottom: 2rem;
+}
+
+.article-body .page-head .overline {
+  color: var(--lav-soft);
+  margin-bottom: 0.4rem;
+}
+
+.article-body h2 {
+  font-size: 1.3rem;
+  margin-block: 2rem 0.8rem;
+}
+
+.article-body table {
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.article-body th,
+.article-body td {
+  border: 1px solid var(--line-soft);
+  padding: 0.45rem 0.9rem;
+  text-align: left;
+}
+
+.article-body th {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--ink-dim);
+}
+
+.article-footer {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 1.2rem;
+}
+
+.article-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.article-nav-link {
+  text-decoration: none;
+  color: var(--ink-soft);
+  padding: 0.6rem 0;
+}
+
+.article-nav-link:hover {
+  color: var(--lav);
+}
+
+.article-nav-link.next {
+  margin-left: auto;
+  text-align: right;
+}
+
+/* Bloc TP embarqué dans un article */
+
+.tp-block {
+  margin-block: 1.8rem;
+  border: 1px solid var(--lav-25);
+  background: var(--bg-raised);
+  padding: 1.2rem 1.4rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.tp-block.is-solved {
+  border-color: color-mix(in srgb, var(--verdict-ac) 35%, transparent);
+}
+
+.tp-block .workbench {
+  /* le poste de travail n'est pas une colonne ici : pas de sticky */
+  position: static;
+}
+
+.tp-head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.tp-chip {
+  color: var(--bg);
+  background: var(--lav);
+  padding: 0.2rem 0.55rem;
+  letter-spacing: 0.18em;
+}
+
+.tp-title {
+  font-size: 1.05rem;
+}
+
+.tp-head .solved-badge {
+  margin-left: 0;
+  vertical-align: baseline;
+}
+
+.tp-open-link {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tp-open-link:hover {
+  color: var(--lav);
+}
+
+.tp-statement summary {
+  cursor: pointer;
+  color: var(--lav-soft);
+  list-style: none;
+}
+
+.tp-statement summary::before {
+  content: '▸ ';
+}
+
+.tp-statement[open] summary::before {
+  content: '▾ ';
+}
+
+.tp-statement-body {
+  padding-top: 0.7rem;
+}
+
+.tp-unavailable {
+  border-style: dashed;
+}
+
+/* « Pour pratiquer » en fin d'article */
+
+.practice-panel {
+  margin-top: 2.2rem;
+}
+
+.practice-panel > h2 {
+  color: var(--lav-soft);
+  letter-spacing: 0.22em;
+  margin-bottom: 0.8rem;
+  font-size: 0.72rem;
+}
+
+.practice-list {
+  list-style: none;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.practice-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line-soft);
+  text-decoration: none;
+}
+
+.practice-row:hover {
+  background: var(--lav-08);
+  border-color: var(--lav-25);
+}
+
+.practice-title {
+  font-weight: 500;
+}
+
+/* Lien « la notion est couverte dans » sur la page problème */
+
+.problem-course-links {
+  margin-top: 0.7rem;
+  font-size: 0.9rem;
+  color: var(--ink-dim);
+}
+
+.problem-course-links a {
+  color: var(--lav-soft);
+  text-decoration: none;
+}
+
+.problem-course-links a:hover {
+  color: var(--lav);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Articles liés dans le panneau de l'arbre de compétences */
+
+.skill-articles {
+  margin-top: 1.2rem;
+}
+
+.skill-articles > p {
+  color: var(--ink-dim);
+  margin-bottom: 0.5rem;
+}
+
+.skill-articles ul {
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* ---- Coloration syntaxique (rehype-highlight) --------------------------
+   Thème maison accordé à la DA : fond bg-raised, accents lavande. */
+
+.hljs {
+  color: var(--ink-soft);
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--ink-dim);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-type {
+  color: var(--lav);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: #a8d8a8;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol {
+  color: #e8c890;
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_ {
+  color: #9fc6ff;
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable {
+  color: var(--lav-soft);
+}
+
+.hljs-meta,
+.hljs-doctag {
+  color: var(--ink-dim);
+}
+
+.hljs-deletion {
+  color: var(--verdict-wa);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
+}

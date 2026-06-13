@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import rehypeKatex from 'rehype-katex';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
 import { api } from '../api';
 import type { Editorial, ProblemDetail, SharedSolution, SubmissionLanguage } from '../api';
 import { useI18n } from '../i18n/context';
+import { Markdown } from './Markdown';
 
 type TabId = 'statement' | 'hints' | 'editorial' | 'solutions';
 
@@ -15,14 +12,6 @@ const LANGUAGE_LABELS: Record<SubmissionLanguage, string> = {
   c: 'C',
   java: 'Java',
 };
-
-function Markdown({ children }: { children: string }) {
-  return (
-    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-      {children}
-    </ReactMarkdown>
-  );
-}
 
 function hintsKey(slug: string) {
   return `clubjudge.hints.${slug}`;

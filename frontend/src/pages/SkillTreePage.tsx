@@ -175,6 +175,23 @@ export function SkillTreePage() {
                     </li>
                   ))}
                 </ul>
+                {current.articles.length > 0 && (
+                  <div className="skill-articles">
+                    <p className="mono-label">{t.skills.articles}</p>
+                    <ul>
+                      {current.articles.map((a) => (
+                        <li key={`${a.course_slug}/${a.article_slug}`}>
+                          <Link
+                            className="problem-link"
+                            to={`/courses/${a.course_slug}/${a.article_slug}`}
+                          >
+                            📖 {lang === 'en' && a.title_en ? a.title_en : a.title_fr}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {current.requires.length > 0 && (
                   <div className="skill-prereqs">
                     <p className="mono-label">{t.skills.prerequisites}</p>

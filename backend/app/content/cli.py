@@ -11,8 +11,21 @@ import sys
 from pathlib import Path
 
 from app.config import get_settings
-from app.content.importer import import_problem_dir, sync_skills, validate_solutions
-from app.content.loader import ContentError, discover_problems, load_problem, load_skills
+from app.content.importer import (
+    import_problem_dir,
+    sync_courses,
+    sync_skills,
+    validate_solutions,
+)
+from app.content.loader import (
+    ContentError,
+    article_refs,
+    discover_courses,
+    discover_problems,
+    load_course,
+    load_problem,
+    load_skills,
+)
 from app.db import SessionLocal
 from app.judge import Judge0Judge
 
@@ -40,15 +53,33 @@ async def _run(command: str, content_dir: Path) -> int:
 
     total = len(problem_dirs)
     print(f"\n{total - failures}/{total} problème(s) valide(s)")
+    problem_slugs = {p.name for p in problem_dirs}
 
-    # L'arbre de compétences (optionnel) se valide après les problèmes : ses
-    # nœuds référencent leurs slugs.
+    # Les cours (optionnels) se valident après les problèmes : leurs blocs TP
+    # et listes `practice` référencent leurs slugs.
+    courses = []
+    for course_dir in discover_courses(content_dir):
+        try:
+            courses.append(load_course(course_dir, problem_slugs))
+            print(f"  OK  courses/{course_dir.name}")
+        except ContentError as exc:
+            failures += 1
+            print(f"ÉCHEC courses/{course_dir.name}\n      {exc}", file=sys.stderr)
+    if courses and command == "import":
+        if failures:
+            print("courses/ : import sauté (des erreurs précèdent)", file=sys.stderr)
+            return 1
+        with SessionLocal() as db:
+            sync_courses(db, courses)
+
+    # L'arbre de compétences (optionnel) se valide en dernier : ses nœuds
+    # référencent problèmes et articles de cours.
     try:
-        skills = load_skills(content_dir, {p.name for p in problem_dirs})
+        skills = load_skills(content_dir, problem_slugs, article_refs(courses))
         if skills:
             if command == "import":
                 if failures:
-                    print("skills.yaml : import sauté (des problèmes ont échoué)",
+                    print("skills.yaml : import sauté (des erreurs précèdent)",
                           file=sys.stderr)
                     return 1
                 with SessionLocal() as db:

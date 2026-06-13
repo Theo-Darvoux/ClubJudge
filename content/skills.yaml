@@ -13,6 +13,8 @@
 #   requires    ids des compétences prérequises (DAG vérifié à l'import)
 #   problems    slugs des problèmes rattachés (3 à 5 idéalement)
 #   mastery     nb d'AC pour maîtriser le nœud (défaut : ~2/3 des problèmes)
+#   articles    références `cours/article` vers les articles qui couvrent la
+#               compétence (optionnel — affichées dans le panneau latéral)
 
 skills:
   - id: premiers-pas
@@ -23,6 +25,7 @@ skills:
       Tout part d'ici.
     position: [0, 0]
     problems: [deux-sommes]
+    articles: [bien-demarrer/entrees-et-sorties]
 
   - id: chaines
     name: Chaînes de caractères
@@ -43,6 +46,7 @@ skills:
     requires: [premiers-pas]
     position: [170, -95]
     problems: [tri-de-dossards, binomes-de-niveau]
+    articles: [bien-demarrer/trier-d-abord]
 
   - id: programmation-dynamique
     name: Programmation dynamique
@@ -53,3 +57,4 @@ skills:
     requires: [tableaux-et-tri]
     position: [340, -190]
     problems: [la-meilleure-semaine]
+    articles: [bien-demarrer/complexite]

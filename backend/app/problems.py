@@ -10,7 +10,16 @@ from app.auth import get_current_user
 from app.contests import hidden_problem_ids, running_contest_for
 from app.db import as_utc, get_db
 from app.judge.types import Verdict
-from app.models import ContestProblem, Problem, ProblemTag, Submission, User
+from app.models import (
+    ArticleProblem,
+    ContestProblem,
+    Course,
+    CourseArticle,
+    Problem,
+    ProblemTag,
+    Submission,
+    User,
+)
 
 router = APIRouter(prefix="/api/problems", tags=["problems"])
 
@@ -39,6 +48,15 @@ class ProblemContestRef(BaseModel):
     end_at: datetime
 
 
+class ProblemArticleRef(BaseModel):
+    """Article de cours qui couvre la notion (lien croisé, PLAN.md Phase 3)."""
+
+    course_slug: str
+    article_slug: str
+    title_fr: str
+    title_en: str | None
+
+
 class ProblemDetail(ProblemSummary):
     statement_fr: str
     statement_en: str | None
@@ -48,6 +66,7 @@ class ProblemDetail(ProblemSummary):
     hints: list[str]
     has_editorial: bool
     contest: ProblemContestRef | None = None
+    articles: list[ProblemArticleRef] = []
 
 
 @router.get("")
@@ -154,6 +173,14 @@ def get_problem(
             )
         )
     ]
+    # Articles de cours qui couvrent la notion (TP ou « pour pratiquer »).
+    article_rows = db.execute(
+        select(Course.slug, CourseArticle.slug, CourseArticle.title_fr, CourseArticle.title_en)
+        .join(CourseArticle, CourseArticle.course_id == Course.id)
+        .join(ArticleProblem, ArticleProblem.article_id == CourseArticle.id)
+        .where(ArticleProblem.problem_id == problem.id)
+        .order_by(Course.slug, CourseArticle.position)
+    ).all()
     return ProblemDetail(
         slug=problem.slug,
         title=problem.title,
@@ -171,10 +198,17 @@ def get_problem(
             for t in problem.tests
             if t.is_sample
         ],
-        # Pendant un contest, pas d'indices ni d'éditorial : conditions ICPC.
+        # Pendant un contest, pas d'indices, d'éditorial ni de lien vers le
+        # cours qui couvre la notion : conditions ICPC.
         hints=[] if contest_ref else [h.content_fr for h in problem.hints],
         has_editorial=problem.editorial_fr is not None and contest_ref is None,
         contest=contest_ref,
+        articles=[] if contest_ref else [
+            ProblemArticleRef(
+                course_slug=c_slug, article_slug=a_slug, title_fr=t_fr, title_en=t_en
+            )
+            for c_slug, a_slug, t_fr, t_en in article_rows
+        ],
     )
 
 

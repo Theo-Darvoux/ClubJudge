@@ -1,0 +1,17 @@
+# Cours d'introduction — le parcours du nouveau membre.
+#
+# Champs :
+#   title       titre affiché (français)
+#   category    catégorie (regroupe les cours sur la page Cours)
+#   description une ou deux phrases pour la carte du cours (optionnel)
+#   position    ordre dans la catégorie (optionnel, défaut 0 puis titre)
+#
+# Les articles sont les fichiers NN-slug.fr.md du dossier : le préfixe
+# numérique fixe l'ordre. Traduction optionnelle en NN-slug.en.md.
+
+title: Bien démarrer
+category: Fondamentaux
+description: >-
+  Lire l'entrée, écrire la sortie, estimer ce que votre programme coûte :
+  tout ce qu'il faut pour résoudre vos premiers problèmes sur la plateforme.
+position: 0
