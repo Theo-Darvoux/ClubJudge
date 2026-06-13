@@ -1,0 +1,14 @@
+# Indices progressifs : du plus vague au plus précis, un par élément.
+- >-
+  Tester toutes les fenêtres de jours consécutifs coûte $O(n^2)$ — trop pour
+  $n = 2 \times 10^5$. Observez ce qui se passe quand vous faites *glisser*
+  une fenêtre d'un jour vers la droite au lieu de la recalculer.
+- >-
+  Les énergies sont $\ge 0$ : si la fenêtre $[g, d]$ dépasse le budget,
+  toute fenêtre $[g, d']$ avec $d' > d$ dépasse aussi. Quand le bord droit
+  avance, le bord gauche n'a donc jamais besoin de reculer.
+- >-
+  Deux pointeurs : avancez le bord droit jour par jour en maintenant la somme
+  de la fenêtre ; tant qu'elle dépasse $B$, avancez le bord gauche. Chaque
+  bord ne fait que $n$ pas au total → $O(n)$. La meilleure longueur observée
+  en route est la réponse.

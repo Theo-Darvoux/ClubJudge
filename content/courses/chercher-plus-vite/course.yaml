@@ -1,0 +1,10 @@
+# Deuxième cours des fondamentaux : les trois techniques de recherche
+# qui font passer de O(n²) à O(n log n) ou O(n).
+
+title: Chercher plus vite
+category: Fondamentaux
+description: >-
+  Ensembles, dictionnaires, dichotomie, deux pointeurs : trois outils pour ne
+  plus jamais comparer toutes les paires — la suite directe de « Bien
+  démarrer ».
+position: 1

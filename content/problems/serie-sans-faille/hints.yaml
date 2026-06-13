@@ -1,0 +1,13 @@
+# Indices progressifs : du plus vague au plus précis, un par élément.
+- >-
+  Reformulez sans l'histoire : « la plus longue fenêtre de positions
+  consécutives contenant au plus $k$ zéros ». Tester toutes les fenêtres
+  coûte $O(n^2)$ — il y a mieux.
+- >-
+  Élargir une fenêtre ne peut pas faire baisser son nombre de zéros : la
+  contrainte « au plus $k$ zéros » a la même monotonie qu'un budget. Quand
+  le bord droit avance, le bord gauche n'a jamais à reculer.
+- >-
+  Fenêtre glissante en comptant les zéros : avancez le bord droit ; tant que
+  la fenêtre contient plus de $k$ zéros, avancez le bord gauche. $O(n)$.
+  Le budget, ici, ce sont les rattrapages.

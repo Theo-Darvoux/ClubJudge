@@ -5,7 +5,7 @@ Alternative moderne à DOMJudge, avec trois sections : **liste de problèmes**,
 **compétitions**, **cours avec TP interactifs**.
 
 > Document de référence du projet — mis à jour au fil des décisions.
-> Dernière mise à jour : 2026-06-13 (Phase 3 livrée).
+> Dernière mise à jour : 2026-06-13 (Phase 3 livrée ; lot de contenu : 2ᵉ cours, 6 problèmes, arbre à 7 nœuds).
 
 ## 1. Objectifs et philosophie
 
@@ -184,8 +184,9 @@ Décision du 2026-06-12. Principes :
       panneau latéral de l'arbre.)*
 - ⚠️ **Chemin critique éditorial, pas technique** : découper le programme du club
   en compétences et prérequis sensés — à faire collectivement au club.
-  *(L'arbre actuel — 4 nœuds, 5 problèmes — est un brouillon d'amorçage marqué
-  comme tel dans `skills.yaml`.)*
+  *(L'arbre actuel — 7 nœuds, 11 problèmes depuis le lot de contenu du
+  2026-06-13 — reste un brouillon d'amorçage marqué comme tel dans
+  `skills.yaml`.)*
 - 🎯 **Jalon : un nouveau membre sait quoi travailler ensuite sans demander.**
   ✓ mécanique en place (2026-06-12) — reste le vrai découpage collectif.
 
@@ -265,6 +266,15 @@ Décision du 2026-06-12. Principes :
   ✓ mécanique en place, testée de bout en bout en local (2026-06-13) avec un
   premier cours de 3 articles (« Bien démarrer ») — étoffer le contenu avec le
   club avant la rentrée.
+- Lot de contenu du 2026-06-13 : deuxième cours **« Chercher plus vite »**
+  (3 articles : ensembles/dictionnaires, dichotomie, deux pointeurs) avec
+  6 nouveaux problèmes (un TP + un entraînement par article : le-doublon,
+  la-paire-parfaite, dans-la-fourchette, planches-à-découper,
+  le-plus-long-sprint, série-sans-faille — catégorie « recherche », gros tests
+  générés par `generator.py` committés) et 3 nouveaux nœuds de l'arbre
+  (ensembles-et-dictionnaires, dichotomie, deux-pointeurs). Le parcours d'intro
+  couvre maintenant 2 cours, 6 articles, 11 problèmes, 7 nœuds — toujours un
+  amorçage : le catalogue définitif se construit avec le club.
 
 ### Phase 4 — Extensions
 

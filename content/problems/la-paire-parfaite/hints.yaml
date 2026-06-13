@@ -1,0 +1,15 @@
+# Indices progressifs : du plus vague au plus précis, un par élément.
+- >-
+  Essayer toutes les paires coûte $O(n^2)$ — $2 \times 10^{10}$ opérations
+  pour $n = 2 \times 10^5$, beaucoup trop. Pour chaque membre, pouvez-vous
+  savoir directement avec qui il forme une bonne paire ?
+- >-
+  Le membre de niveau $v$ cherche des partenaires de niveau exactement
+  $t - v$. La question devient : « combien de niveaux $t - v$ ai-je déjà
+  croisés ? » — un dictionnaire valeur → nombre d'occurrences y répond
+  en $O(1)$.
+- >-
+  Un seul passage : pour chaque $v$, ajoutez `compte[t - v]` à la réponse,
+  puis incrémentez `compte[v]`. Chaque paire est comptée une fois (au passage
+  de son deuxième membre). Attention : la réponse peut dépasser $2^{32}$,
+  prenez un entier 64 bits en C++/Java.

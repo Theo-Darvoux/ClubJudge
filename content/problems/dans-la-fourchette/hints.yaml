@@ -1,0 +1,14 @@
+# Indices progressifs : du plus vague au plus précis, un par élément.
+- >-
+  Parcourir tous les prix à chaque question coûte $O(nq)$ — jusqu'à
+  $10^{10}$ opérations. Les prix ne changent jamais : que pourriez-vous
+  préparer une fois pour toutes pour répondre plus vite ensuite ?
+- >-
+  Dans un tableau trié, « combien de valeurs $\le b$ ? » se répond en
+  $O(\log n)$ par dichotomie. Et compter les valeurs dans $[a, b]$, c'est
+  compter celles $\le b$ moins celles $< a$.
+- >-
+  Triez les prix une fois ($O(n \log n)$), puis pour chaque question :
+  `bisect_right(p, b) - bisect_left(p, a)` en Python,
+  `upper_bound(b) - lower_bound(a)` en C++. Total :
+  $O((n + q) \log n)$.

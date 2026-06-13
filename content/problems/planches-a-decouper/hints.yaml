@@ -1,0 +1,14 @@
+# Indices progressifs : du plus vague au plus précis, un par élément.
+- >-
+  Tester chaque longueur $L$ de $1$ à $10^9$ est exclu. Mais remarquez que
+  *vérifier* une longueur donnée est facile : combien de tasseaux de
+  longueur $L$ obtient-on ? $\sum_i \lfloor \ell_i / L \rfloor$, en $O(n)$.
+- >-
+  Si une longueur $L$ donne assez de tasseaux, toute longueur plus petite en
+  donne au moins autant. « Ça passe » est donc vrai sur $1..L^\*$ puis faux
+  au-delà : la frontière se trouve par dichotomie.
+- >-
+  Dichotomie **sur la réponse** : `lo = 0`, `hi = max(ℓ)` ; à chaque tour,
+  testez le milieu et gardez la moitié cohérente. Environ $30$ tests à
+  $O(n)$ chacun. Attention aux 64 bits : $\sum \ell_i$ peut atteindre
+  $10^{14}$.

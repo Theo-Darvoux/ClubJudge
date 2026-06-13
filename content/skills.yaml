@@ -37,6 +37,17 @@ skills:
     position: [-170, -95]
     problems: [le-mot-le-plus-long]
 
+  - id: ensembles-et-dictionnaires
+    name: Ensembles et dictionnaires
+    name_en: Sets and dictionaries
+    description: >-
+      Le hachage : répondre à « déjà vu ? » et « combien de fois ? » en temps
+      constant, et faire fondre les O(n²).
+    requires: [premiers-pas]
+    position: [0, -190]
+    problems: [le-doublon, la-paire-parfaite]
+    articles: [chercher-plus-vite/ensembles-et-dictionnaires]
+
   - id: tableaux-et-tri
     name: Tableaux et tri
     name_en: Arrays and sorting
@@ -47,6 +58,28 @@ skills:
     position: [170, -95]
     problems: [tri-de-dossards, binomes-de-niveau]
     articles: [bien-demarrer/trier-d-abord]
+
+  - id: dichotomie
+    name: Dichotomie
+    name_en: Binary search
+    description: >-
+      Couper l'espace de recherche en deux, 30 fois — sur un tableau trié,
+      puis directement sur la réponse.
+    requires: [tableaux-et-tri]
+    position: [170, -285]
+    problems: [dans-la-fourchette, planches-a-decouper]
+    articles: [chercher-plus-vite/la-dichotomie]
+
+  - id: deux-pointeurs
+    name: Deux pointeurs
+    name_en: Two pointers
+    description: >-
+      Une fenêtre qui glisse sur le tableau : le plus long sous-tableau sous
+      contrainte en un seul passage.
+    requires: [tableaux-et-tri]
+    position: [340, -30]
+    problems: [le-plus-long-sprint, serie-sans-faille]
+    articles: [chercher-plus-vite/deux-pointeurs]
 
   - id: programmation-dynamique
     name: Programmation dynamique

@@ -1,0 +1,12 @@
+# Indices progressifs : du plus vague au plus précis, un par élément.
+- >-
+  Pour chaque numéro, re-parcourir tous les précédents coûte $O(n^2)$ :
+  jusqu'à $2 \times 10^{10}$ comparaisons. Il faut savoir répondre à
+  « ce numéro est-il déjà passé ? » sans tout relire.
+- >-
+  Quelle structure de données répond à « cet élément est-il dedans ? »
+  en temps (quasi) constant ?
+- >-
+  Un ensemble (`set` en Python, `unordered_set` en C++) : parcourez les
+  numéros de gauche à droite, testez l'appartenance puis insérez. Premier
+  test positif = réponse. Coût total $O(n)$ en moyenne.
