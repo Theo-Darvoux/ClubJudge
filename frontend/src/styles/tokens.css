@@ -56,6 +56,7 @@
   --font-body: 'Satoshi', system-ui, sans-serif;
   --font-mono: ui-monospace, 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Menlo, monospace;
 
+  --nav-h: 3.6rem;
   --notch: 16px;
   --notch-sm: 10px;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);

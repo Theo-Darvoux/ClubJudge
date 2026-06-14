@@ -70,6 +70,11 @@ export const en: typeof fr = {
       'The problem list is still available.',
     loading: 'loading…',
     articles: 'Learn',
+    zoom_in: 'Zoom in',
+    zoom_out: 'Zoom out',
+    recenter: 'Recenter',
+    close_panel: 'Close',
+    explore_hint: 'Drag to explore · scroll to zoom',
   },
   courses: {
     title: 'Courses',
@@ -245,6 +250,8 @@ export const en: typeof fr = {
     sort_memory: 'Sort by memory',
     sort_recent: 'Most recent',
     mine_badge: 'you',
+    hide_statement: 'Hide statement',
+    show_statement: 'Show statement',
   },
   verdict: {
     AC: 'Accepted',

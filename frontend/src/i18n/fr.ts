@@ -69,6 +69,11 @@ export const fr = {
       'La liste des problèmes reste disponible.',
     loading: 'chargement…',
     articles: 'Pour apprendre',
+    zoom_in: 'Zoom avant',
+    zoom_out: 'Zoom arrière',
+    recenter: 'Recentrer',
+    close_panel: 'Fermer',
+    explore_hint: 'Glissez pour explorer · molette pour zoomer',
   },
   courses: {
     title: 'Cours',
@@ -248,6 +253,8 @@ export const fr = {
     sort_memory: 'Tri par mémoire',
     sort_recent: 'Plus récentes',
     mine_badge: 'vous',
+    hide_statement: 'Masquer l’énoncé',
+    show_statement: 'Afficher l’énoncé',
   },
   verdict: {
     AC: 'Accepté',

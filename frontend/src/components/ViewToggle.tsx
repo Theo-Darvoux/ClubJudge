@@ -15,3 +15,21 @@ export function ViewToggle() {
     </nav>
   );
 }
+
+/**
+ * En-tête flottant partagé par les deux vues de la section Problèmes. Ancré au
+ * même point (haut-gauche, position fixe) dans l'arbre et la liste : la bascule
+ * Arbre/Liste ne bouge plus d'un pixel d'une vue à l'autre.
+ */
+export function ProblemsHeader({ overline }: { overline: string }) {
+  const { t } = useI18n();
+  return (
+    <header className="problems-head floating">
+      <div className="problems-head-titles">
+        <p className="mono-label">{overline}</p>
+        <h1>{t.skills.title}</h1>
+      </div>
+      <ViewToggle />
+    </header>
+  );
+}

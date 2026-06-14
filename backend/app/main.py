@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app import admin, auth, contests, courses, problems, skills, submissions
+from app import admin, auth, contests, courses, lsp, problems, skills, submissions
 from app.config import get_settings
 from app.db import engine
 from app.judge import Judge0Judge
@@ -41,6 +41,7 @@ app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(contests.router)
 app.include_router(courses.router)
+app.include_router(lsp.router)
 app.include_router(problems.router)
 app.include_router(skills.router)
 app.include_router(submissions.router)

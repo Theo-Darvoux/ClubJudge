@@ -6,8 +6,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      // En dév, le backend FastAPI tourne sur l'hôte (uv run fastapi dev)
-      '/api': 'http://localhost:8000',
+      // En dév, le backend FastAPI tourne sur l'hôte (uv run fastapi dev).
+      // ws: true → proxifie aussi le WebSocket LSP clangd (/api/lsp/...).
+      '/api': { target: 'http://localhost:8000', ws: true },
     },
   },
 });

@@ -3,6 +3,7 @@ import { api } from '../api';
 import type { Editorial, ProblemDetail, SharedSolution, SubmissionLanguage } from '../api';
 import { useI18n } from '../i18n/context';
 import { Markdown } from './Markdown';
+import { CodeBlock } from './CodeBlock';
 
 type TabId = 'statement' | 'hints' | 'editorial' | 'solutions';
 
@@ -240,9 +241,11 @@ function SolutionsPanel({ slug, solved }: { slug: string; solved: boolean }) {
                   {s.memory_kb != null && ` · ${Math.round(s.memory_kb / 1024)} Mo`}
                 </span>
               </header>
-              <pre className="solution-code">
-                <code>{s.source_code}</code>
-              </pre>
+              <CodeBlock
+                className="solution-code"
+                code={s.source_code}
+                language={s.language}
+              />
             </section>
           ))}
         </>

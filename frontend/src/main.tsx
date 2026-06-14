@@ -14,6 +14,7 @@ import { CoursePage } from './pages/CoursePage';
 import { CoursesPage } from './pages/CoursesPage';
 import { ProblemPage } from './pages/ProblemPage';
 import { ProblemsPage } from './pages/ProblemsPage';
+import { ProblemsDataProvider } from './problems/ProblemsDataProvider';
 import { SkillTreePage } from './pages/SkillTreePage';
 import './styles/global.css';
 
@@ -31,8 +32,12 @@ createRoot(document.getElementById('root')!).render(
                 </RequireAuth>
               }
             >
-              <Route path="/problems" element={<SkillTreePage />} />
-              <Route path="/problems/list" element={<ProblemsPage />} />
+              {/* Arbre + liste partagent leurs données (bascule instantanée) ;
+                  les pages problème restent hors de ce provider. */}
+              <Route element={<ProblemsDataProvider />}>
+                <Route path="/problems" element={<SkillTreePage />} />
+                <Route path="/problems/list" element={<ProblemsPage />} />
+              </Route>
               <Route path="/problems/:slug" element={<ProblemPage />} />
               <Route path="/contests" element={<ContestsPage />} />
               <Route path="/contests/:slug" element={<ContestPage />} />

@@ -1,10 +1,15 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/context';
 import { useI18n } from '../i18n/context';
 
 export function Layout() {
   const { t, lang, setLang } = useI18n();
   const { user, logout } = useAuth();
+  const { pathname } = useLocation();
+  // Les deux vues de la section Problèmes (arbre /problems, liste /problems/list)
+  // sont plein écran : on retire le conteneur centré et les marges du <main>
+  // pour leur laisser tout l'espace. Les pages problème (/problems/:slug) non.
+  const bleed = pathname === '/problems' || pathname === '/problems/list';
 
   return (
     <>
@@ -55,7 +60,7 @@ export function Layout() {
           </div>
         </div>
       </header>
-      <main className="container app-main">
+      <main className={bleed ? 'app-main app-main--bleed' : 'container app-main'}>
         <Outlet />
       </main>
     </>

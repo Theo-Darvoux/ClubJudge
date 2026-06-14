@@ -1,10 +1,12 @@
-import Editor from '@monaco-editor/react';
+import Editor, { type OnMount } from '@monaco-editor/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '../api';
 import type { RunResult, Submission, SubmissionLanguage } from '../api';
 import { useNow } from '../contest-utils';
 import { useI18n } from '../i18n/context';
 import { VerdictBadge, VerdictChip } from './badges';
+import { registerIntellisense } from './editor-intellisense';
+import type { LspProvider } from './lsp-setup';
 
 const LANGUAGES: { id: SubmissionLanguage; label: string; monaco: string }[] = [
   { id: 'cpp', label: 'C++', monaco: 'cpp' },
@@ -69,10 +71,87 @@ export function Workbench({
   const [showCustom, setShowCustom] = useState(false);
   const [customInput, setCustomInput] = useState('');
 
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
+  const pyrightRef = useRef<LspProvider | null>(null);
+  const clangdRef = useRef<LspProvider | null>(null);
+
   useEffect(() => {
     if (!showHistory) return;
     api.mySubmissions(slug).then(setHistory).catch(() => {});
   }, [slug, showHistory]);
+
+  // IntelliSense sémantique via les serveurs de langage côté serveur (basedpyright
+  // pour Python, clangd pour C/C++), relayés en WebSocket par l'API (cf.
+  // lsp-setup.ts + backend/app/lsp.py). Chargés à la demande, défensifs : on
+  // retombe sur l'auto-complétion statique si le serveur (ou son binaire) est
+  // indisponible. Les diagnostics se branchent par éditeur, donc on les coupe en
+  // quittant le langage (sinon on linterait un langage avec l'analyseur d'un autre).
+  const startPyright = useCallback(async () => {
+    const monaco = monacoRef.current;
+    const editor = editorRef.current;
+    if (!monaco || !editor) return;
+    try {
+      if (!pyrightRef.current) {
+        const { loadPyright } = await import('./lsp-setup');
+        pyrightRef.current = await loadPyright(monaco);
+      }
+      pyrightRef.current.setupDiagnostics(editor);
+    } catch (err) {
+      console.warn('basedpyright indisponible — auto-complétion Python réduite.', err);
+    }
+  }, []);
+
+  const startClangd = useCallback(async () => {
+    const monaco = monacoRef.current;
+    const editor = editorRef.current;
+    if (!monaco || !editor) return;
+    try {
+      if (!clangdRef.current) {
+        const { loadClangd } = await import('./lsp-setup');
+        clangdRef.current = await loadClangd(monaco);
+      }
+      clangdRef.current.setupDiagnostics(editor);
+    } catch (err) {
+      console.warn('clangd indisponible — auto-complétion C/C++ réduite.', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (language === 'python') {
+      startPyright();
+    } else if (editor) {
+      pyrightRef.current?.stopDiagnostics(editor);
+    }
+    if (language === 'cpp' || language === 'c') {
+      startClangd();
+    } else if (editor) {
+      clangdRef.current?.stopDiagnostics(editor);
+    }
+  }, [language, startPyright, startClangd]);
+
+  // Au démontage du Workbench (ex. navigation, ou bloc TP qui disparaît), on
+  // détache cet éditeur des serveurs LSP : dispose l'écouteur et efface les
+  // marqueurs. Le client lui-même (singleton) reste pour les autres éditeurs.
+  useEffect(() => {
+    return () => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      pyrightRef.current?.stopDiagnostics(editor);
+      clangdRef.current?.stopDiagnostics(editor);
+    };
+  }, []);
+
+  const onEditorMount = useCallback<OnMount>(
+    (editor, monaco) => {
+      editorRef.current = editor;
+      monacoRef.current = monaco;
+      if (language === 'python') startPyright();
+      if (language === 'cpp' || language === 'c') startClangd();
+    },
+    [language, startPyright, startClangd],
+  );
 
   const switchLanguage = useCallback(
     (next: SubmissionLanguage) => {
@@ -169,6 +248,7 @@ export function Workbench({
           language={monacoLang}
           value={code}
           onChange={onCodeChange}
+          onMount={onEditorMount}
           theme="clubjudge"
           beforeMount={(monaco) => {
             monaco.editor.defineTheme('clubjudge', {
@@ -180,13 +260,24 @@ export function Workbench({
                 'editorLineNumber.foreground': '#807c92',
               },
             });
+            registerIntellisense(monaco);
           }}
           options={{
+            automaticLayout: true,
             minimap: { enabled: false },
             fontSize: 14,
             fontFamily: "'JetBrains Mono', ui-monospace, monospace",
             scrollBeyondLastLine: false,
             padding: { top: 12 },
+            // Rend les popups (complétion, hover, signature) au niveau du body :
+            // sinon ils sont rognés par l'overflow: hidden de .editor-frame.
+            fixedOverflowWidgets: true,
+            // Auto-complétion plus réactive (snippets en tête + mots du buffer).
+            quickSuggestions: { other: true, comments: false, strings: false },
+            suggestOnTriggerCharacters: true,
+            tabCompletion: 'on',
+            snippetSuggestions: 'top',
+            wordBasedSuggestions: 'currentDocument',
           }}
         />
       </div>

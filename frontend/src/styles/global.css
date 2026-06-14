@@ -160,7 +160,7 @@ h3 {
   display: flex;
   align-items: center;
   gap: 2.2rem;
-  min-height: 3.6rem;
+  min-height: var(--nav-h);
 }
 
 .brand {
@@ -436,8 +436,10 @@ select {
   text-underline-offset: 3px;
 }
 
-.problem-link::after {
-  /* étend la zone cliquable à la ligne entière */
+.problem-table .problem-link::after {
+  /* étend la zone cliquable à la ligne entière du tableau ; à réserver au
+     tableau : ailleurs (panneau de l'arbre…) ça recouvrirait tout le
+     conteneur positionné et capterait les clics destinés aux autres liens */
   content: '';
   position: absolute;
   inset: 0;
@@ -512,6 +514,136 @@ select {
   padding-block: 2rem;
 }
 
+/* ---- Vue liste plein écran (assortie à l'arbre de compétences) ---------- */
+
+/* Même toile immersive que l'arbre : fond fixe sous la navigation, dégradé
+   lavande, défilement interne. L'en-tête flottant (titre + bascule) se
+   superpose au même endroit que dans l'arbre. */
+.problems-fullscreen {
+  position: fixed;
+  inset: var(--nav-h) 0 0 0;
+  overflow-y: auto;
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--lav-08), transparent 60%),
+    var(--bg);
+}
+
+.problems-scroll {
+  width: min(var(--container), 100% - 3rem);
+  margin-inline: auto;
+  /* dégage la hauteur de l'en-tête flottant ancré en haut-gauche */
+  padding-top: 6.5rem;
+  padding-bottom: 4rem;
+}
+
+.problems-scroll .filters {
+  margin-bottom: 1.4rem;
+}
+
+.problem-list {
+  --prob-cols: 1.6rem minmax(0, 1fr) 12rem 10rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.problem-list-head {
+  display: grid;
+  grid-template-columns: var(--prob-cols);
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.2rem 0.3rem;
+}
+
+.problem-list-head .mono-label {
+  font-size: 0.7rem;
+  color: var(--ink-dim);
+}
+
+.problem-row {
+  display: grid;
+  grid-template-columns: var(--prob-cols);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.2rem;
+  text-decoration: none;
+  color: inherit;
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--notch-sm)) 0,
+    100% var(--notch-sm),
+    100% 100%,
+    var(--notch-sm) 100%,
+    0 calc(100% - var(--notch-sm))
+  );
+  transition: box-shadow 0.22s var(--ease-out), background 0.22s var(--ease-out),
+    transform 0.22s var(--ease-out);
+}
+
+.problem-row:hover {
+  background: var(--lav-08);
+  box-shadow: inset 0 0 0 1px var(--lav-25);
+  transform: translateX(3px);
+}
+
+.problem-row:focus-visible {
+  outline-offset: -2px;
+}
+
+.problem-row-status {
+  display: inline-flex;
+  justify-content: center;
+}
+
+.problem-row-main {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.problem-row-title {
+  font-weight: 500;
+  transition: color 0.22s var(--ease-out);
+}
+
+.problem-row:hover .problem-row-title {
+  color: var(--lav);
+}
+
+.problem-row-category {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.problem-row-difficulty {
+  display: inline-flex;
+  justify-content: flex-start;
+}
+
+@media (max-width: 720px) {
+  .problem-list {
+    --prob-cols: 1.4rem minmax(0, 1fr) auto;
+  }
+
+  .problem-list-head,
+  .problem-row-category {
+    display: none;
+  }
+
+  .problem-row-difficulty .difficulty-label {
+    display: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .problems-scroll {
+    padding-top: 5.5rem;
+  }
+}
+
 /* ---- Page problème ----------------------------------------------------- */
 
 .breadcrumb {
@@ -565,10 +697,41 @@ select {
   align-items: start;
 }
 
+.problem-columns--single {
+  grid-template-columns: 1fr;
+}
+
 @media (max-width: 1080px) {
   .problem-columns {
     grid-template-columns: 1fr;
   }
+}
+
+.btn-toggle-statement {
+  background: var(--bg-raised);
+  border: 1px solid var(--line-soft);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.22rem 0.6rem;
+  transition: all 0.22s var(--ease-out);
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.btn-toggle-statement:hover {
+  border-color: var(--lav-25);
+  color: var(--lav);
+  background: var(--lav-08);
+}
+
+.btn-toggle-statement svg {
+  display: block;
 }
 
 .statement {
@@ -625,6 +788,7 @@ select {
   top: 5rem;
   display: grid;
   gap: 0.9rem;
+  min-width: 0;
 }
 
 @media (max-width: 1080px) {
@@ -648,6 +812,8 @@ select {
 .editor-frame {
   border: 1px solid var(--line);
   background: var(--bg-raised);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .submit-row {
@@ -1157,26 +1323,58 @@ select {
   background: var(--lav);
 }
 
-.skilltree-layout {
+/* ---- Arbre de compétences — canvas plein écran ------------------------- */
+
+/* Le <main> de /problems perd ses marges : le canvas occupe tout l'espace. */
+.app-main--bleed {
+  padding: 0;
+}
+
+/* Plein écran sous la barre de navigation collante. Position fixe pour que
+   le panneau et les contrôles s'ancrent au viewport, pas au contenu pannable. */
+.skilltree-fullscreen {
+  position: fixed;
+  inset: var(--nav-h) 0 0 0;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--lav-08), transparent 60%),
+    var(--bg);
+}
+
+.skilltree-fullscreen.is-message {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(17rem, 24rem);
-  gap: 1.2rem;
-  align-items: start;
+  place-content: center;
+  gap: 1rem;
+  text-align: center;
+  padding: 2rem;
 }
 
-@media (max-width: 900px) {
-  .skilltree-layout {
-    grid-template-columns: 1fr;
-  }
+/* La librairie pan/zoom : on force le viewport à remplir l'écran. */
+.skilltree-viewport {
+  width: 100% !important;
+  height: 100% !important;
+  cursor: grab;
 }
 
-.skilltree-canvas .panel-inner {
-  padding: clamp(0.8rem, 2vw, 1.4rem);
+.skilltree-viewport:active {
+  cursor: grabbing;
 }
 
-.skilltree-canvas svg {
-  width: 100%;
-  height: auto;
+.skilltree-content {
+  /* Le SVG est dimensionné en px, on laisse la lib le transformer. */
+  align-items: center;
+  transition: opacity 0.2s var(--ease-out);
+}
+
+/* Avant le premier centrage : on masque l'arbre pour ne pas laisser voir une
+   frame à sa position brute (les overlays flottants, eux, restent visibles). */
+.skilltree-fullscreen.is-precenter .skilltree-content {
+  opacity: 0;
+}
+
+.skilltree-fullscreen svg {
+  display: block;
+  overflow: visible;
 }
 
 .skill-edge {
@@ -1215,6 +1413,12 @@ select {
   font-size: 15px;
   text-anchor: middle;
   pointer-events: none;
+  /* Halo couleur fond derrière le texte : le connecteur qui passe sous le nom
+     est masqué autour des lettres, le label reste lisible. */
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 5px;
+  stroke-linejoin: round;
 }
 
 /* Maîtrisé : lavande pleine — la récompense visuelle. */
@@ -1262,6 +1466,73 @@ select {
   stroke-width: 2.5;
 }
 
+/* Halo derrière l'hexagone : invisible au repos, s'allume au survol et pour
+   le nœud recommandé (pulsation douce « regarde par ici »). */
+.skill-hex-halo {
+  fill: none;
+  stroke: var(--lav);
+  stroke-width: 2;
+  opacity: 0;
+  transition: opacity 0.3s var(--ease-out);
+  pointer-events: none;
+}
+
+.skill-node:hover .skill-hex-halo,
+.skill-node:focus-visible .skill-hex-halo,
+.skill-node.is-selected .skill-hex-halo {
+  opacity: 0.5;
+}
+
+.skill-node.is-recommended .skill-hex-halo {
+  opacity: 0.35;
+  animation: skill-pulse 2.4s var(--ease-out) infinite;
+}
+
+@keyframes skill-pulse {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Mise en évidence du chemin : tout ce qui n'est pas sur la route s'estompe. */
+.skill-node {
+  transition: opacity 0.25s var(--ease-out);
+}
+
+.skill-node.is-dim {
+  opacity: 0.28;
+}
+
+.skill-edge {
+  transition: opacity 0.25s var(--ease-out), stroke 0.25s var(--ease-out);
+}
+
+.skill-edge.is-dim {
+  opacity: 0.18;
+}
+
+.skill-edge.is-path {
+  stroke: var(--lav);
+  stroke-width: 2.5;
+}
+
+/* Arête de la « frontière » (maîtrisé → recommandé) : flux lumineux animé. */
+.skill-edge.is-flow {
+  stroke: var(--lav);
+  stroke-dasharray: 7 7;
+  animation: skill-flow 1s linear infinite;
+}
+
+@keyframes skill-flow {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+
 .skill-legend {
   display: flex;
   flex-wrap: wrap;
@@ -1278,6 +1549,105 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* ---- Surcouches flottantes du canvas ----------------------------------- */
+
+/* Carte en verre dépoli partagée par les overlays (header, légende, panneau). */
+.problems-head.floating,
+.skill-legend.floating,
+.skill-panel.floating {
+  position: absolute;
+  z-index: 5;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--line);
+  border-radius: var(--notch-sm);
+}
+
+/* L'en-tête est ancré au viewport (position: fixed) et non au conteneur de la
+   vue : il occupe ainsi le même point exact dans l'arbre et dans la liste, donc
+   la bascule Arbre/Liste reste rigoureusement immobile entre les deux vues. */
+.problems-head.floating {
+  position: fixed;
+  top: calc(var(--nav-h) + 1.1rem);
+  left: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 1.6rem;
+  padding: 0.7rem 1.1rem;
+}
+
+.problems-head-titles {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.problems-head.floating h1 {
+  font-size: 1.25rem;
+  margin: 0.1rem 0 0;
+}
+
+.skill-legend.floating {
+  top: 1.1rem;
+  right: 1.1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: 14rem;
+  margin: 0;
+  padding: 0.8rem 0.95rem;
+  font-size: 0.78rem;
+}
+
+.skill-legend.floating .legend-note {
+  margin-left: 0;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line-soft);
+  line-height: 1.35;
+}
+
+/* Contrôles de zoom : pile verticale en bas à droite. */
+.skilltree-controls {
+  position: absolute;
+  z-index: 5;
+  bottom: 1.2rem;
+  right: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.map-ctrl {
+  width: 2.4rem;
+  height: 2.4rem;
+  display: grid;
+  place-items: center;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--ink-soft);
+  background: var(--bg-overlay);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--line);
+  border-radius: var(--notch-sm);
+  cursor: pointer;
+  transition: color 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+}
+
+.map-ctrl:hover {
+  color: var(--lav);
+  border-color: var(--lav);
+}
+
+.skilltree-hint {
+  position: absolute;
+  z-index: 4;
+  bottom: 1.4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--ink-dim);
+  pointer-events: none;
+  font-size: 0.72rem;
 }
 
 .legend-hex {
@@ -1302,9 +1672,57 @@ select {
   margin-left: auto;
 }
 
+/* Panneau d'information flottant : bas-gauche, glisse en entrée/sortie. */
+.skill-panel.floating {
+  bottom: 1.2rem;
+  left: 1.1rem;
+  width: min(24rem, calc(100vw - 2.2rem));
+  max-height: min(34rem, calc(100% - 2.4rem));
+  overflow-y: auto;
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+  transform-origin: bottom left;
+  pointer-events: none;
+  transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out);
+}
+
+.skill-panel.floating.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
 .skill-panel .panel-inner {
   display: grid;
   gap: 0.9rem;
+  padding: 1.2rem 1.3rem;
+}
+
+.skill-panel-close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--lav-08);
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color 0.2s var(--ease-out), background 0.2s var(--ease-out);
+}
+
+.skill-panel-close:hover {
+  color: var(--ink);
+  background: var(--lav-14);
+}
+
+.skill-panel h2 {
+  margin: 0;
+  padding-right: 2rem;
 }
 
 .skill-state-label.is-mastered {
@@ -1371,6 +1789,37 @@ select {
 /* Dans le panneau, les pastilles suffisent (le libellé reste en title). */
 .skill-problems .difficulty-label {
   display: none;
+}
+
+/* Écrans étroits : le panneau devient une feuille en bas, la légende se range. */
+@media (max-width: 680px) {
+  .skill-legend.floating {
+    display: none;
+  }
+
+  .problems-head.floating {
+    top: calc(var(--nav-h) + 0.7rem);
+    left: 0.7rem;
+    right: 0.7rem;
+    gap: 1rem;
+    padding: 0.55rem 0.85rem;
+  }
+
+  .problems-head.floating h1 {
+    font-size: 1.05rem;
+  }
+
+  .skill-panel.floating {
+    left: 0.6rem;
+    right: 0.6rem;
+    bottom: 0.6rem;
+    width: auto;
+    max-height: 55vh;
+  }
+
+  .skilltree-hint {
+    display: none;
+  }
 }
 
 /* ---- Compétitions ------------------------------------------------------- */
