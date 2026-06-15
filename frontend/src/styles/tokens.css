@@ -49,6 +49,12 @@
   --lav-08: rgba(220, 183, 255, 0.08);
   --lav-14: rgba(220, 183, 255, 0.14);
   --lav-25: rgba(220, 183, 255, 0.25);
+  /* Or — la couleur de la maîtrise : un nœud terminé, toujours allumé. */
+  --gold: #ffd07a;
+  --gold-soft: rgba(255, 208, 122, 0.62);
+  --gold-08: rgba(255, 208, 122, 0.10);
+  --gold-25: rgba(255, 208, 122, 0.28);
+  --gold-glow: rgba(255, 208, 122, 0.45);
   --line: rgba(220, 183, 255, 0.13);
   --line-soft: rgba(244, 242, 250, 0.07);
 
@@ -68,4 +74,12 @@
   --verdict-tle: #ffd27f;
   --verdict-re: #ffab7f;
   --verdict-ce: #807c92;
+
+  /* Échelle de difficulté, vert → or → rouge : lisible d'un coup d'œil.
+     Alignée sur la palette des verdicts pour rester cohérente. */
+  --diff-1: #7fe0a7;
+  --diff-2: #b4dd86;
+  --diff-3: #ffd07a;
+  --diff-4: #ffab7f;
+  --diff-5: #ff8b9e;
 }

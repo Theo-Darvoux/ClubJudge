@@ -4,18 +4,21 @@ import cpp from 'highlight.js/lib/languages/cpp';
 import c from 'highlight.js/lib/languages/c';
 import python from 'highlight.js/lib/languages/python';
 import java from 'highlight.js/lib/languages/java';
+import ocaml from 'highlight.js/lib/languages/ocaml';
 import type { SubmissionLanguage } from '../api';
 
 hljs.registerLanguage('cpp', cpp);
 hljs.registerLanguage('c', c);
 hljs.registerLanguage('python', python);
 hljs.registerLanguage('java', java);
+hljs.registerLanguage('ocaml', ocaml);
 
 const HLJS_LANG: Record<SubmissionLanguage, string> = {
   cpp: 'cpp',
   c: 'c',
   python: 'python',
   java: 'java',
+  ocaml: 'ocaml',
 };
 
 /* Bloc de code coloré (solutions partagées) : highlight.js + thème dans global.css. */

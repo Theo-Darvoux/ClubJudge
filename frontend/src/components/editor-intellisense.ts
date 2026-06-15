@@ -178,12 +178,132 @@ const JAVA: Item[] = [
   { label: 'HashMap', insert: 'HashMap<${1:Integer}, ${2:Integer}>', detail: 'java.util.HashMap', doc: 'Dictionnaire à accès moyen `O(1)`.', snippet: true, kind: 'class' },
 ];
 
+const OCAML: Item[] = [
+  {
+    label: 'main',
+    insert: 'let () =\n\t$0',
+    detail: 'Point d’entrée',
+    doc: 'Bloc d’entrée exécuté au lancement du programme.',
+    snippet: true,
+    kind: 'keyword',
+  },
+  {
+    label: 'letrec',
+    insert: 'let rec ${1:f} ${2:x} =\n\t$0',
+    detail: 'Fonction récursive',
+    doc: 'Définit une fonction récursive (`let rec`).',
+    snippet: true,
+    kind: 'keyword',
+  },
+  {
+    label: 'forn',
+    insert: 'for ${1:i} = 0 to ${2:n} - 1 do\n\t$0\ndone',
+    detail: 'Boucle for de 0 à n-1',
+    doc: 'Itère `i` de `0` à `n-1`.',
+    snippet: true,
+    kind: 'keyword',
+  },
+  {
+    label: 'scanf',
+    insert: 'Scanf.scanf " %d" (fun ${1:x} -> $0)',
+    detail: 'Lecture formatée',
+    doc: 'Lit l’entrée selon un format et passe les valeurs lues à la fonction.',
+    snippet: true,
+    kind: 'function',
+  },
+  { label: 'printf', insert: 'Printf.printf "${1:%d}\\n" ', detail: 'Printf.printf', doc: 'Écrit sur la sortie selon un format (`%d`, `%s`, `%f`…).', snippet: true, kind: 'function' },
+  { label: 'read_int', insert: 'read_int ()', detail: 'Lecture d’un entier', doc: 'Lit un entier sur une ligne de l’entrée standard.', kind: 'function' },
+  { label: 'read_line', insert: 'read_line ()', detail: 'Lecture d’une ligne', doc: 'Lit la prochaine ligne de l’entrée standard (sans le `\\n`).', kind: 'function' },
+  // Les symboles de la bibliothèque standard (List.map, Array.make…) sont
+  // fournis par ocamllsp/merlin quand il est chargé ; on ne garde ici que les
+  // snippets compétitifs.
+];
+
 const ITEMS: Record<SubmissionLanguage, Item[]> = {
   cpp: CPP,
   c: C,
   python: PYTHON,
   java: JAVA,
+  ocaml: OCAML,
 };
+
+// Monaco ne livre pas de coloration pour OCaml (ses « basic-languages » ont
+// fsharp, cameligo… mais pas ocaml). On enregistre donc nous-mêmes le langage
+// et une grammaire Monarch, sinon l'éditeur affiche le code en texte brut.
+function registerOcaml(monaco: Monaco): void {
+  monaco.languages.register({ id: 'ocaml', extensions: ['.ml', '.mli'], aliases: ['OCaml'] });
+
+  monaco.languages.setLanguageConfiguration('ocaml', {
+    comments: { blockComment: ['(*', '*)'] },
+    brackets: [
+      ['{', '}'],
+      ['[', ']'],
+      ['(', ')'],
+    ],
+    autoClosingPairs: [
+      { open: '{', close: '}' },
+      { open: '[', close: ']' },
+      { open: '(', close: ')' },
+      { open: '"', close: '"' },
+    ],
+    surroundingPairs: [
+      { open: '{', close: '}' },
+      { open: '[', close: ']' },
+      { open: '(', close: ')' },
+      { open: '"', close: '"' },
+    ],
+  });
+
+  monaco.languages.setMonarchTokensProvider('ocaml', {
+    defaultToken: '',
+    tokenPostfix: '.ocaml',
+    keywords: [
+      'and', 'as', 'assert', 'begin', 'class', 'constraint', 'do', 'done', 'downto',
+      'else', 'end', 'exception', 'external', 'false', 'for', 'fun', 'function',
+      'functor', 'if', 'in', 'include', 'inherit', 'initializer', 'lazy', 'let',
+      'match', 'method', 'module', 'mutable', 'new', 'nonrec', 'object', 'of', 'open',
+      'or', 'private', 'rec', 'sig', 'struct', 'then', 'to', 'true', 'try', 'type',
+      'val', 'virtual', 'when', 'while', 'with',
+    ],
+    operators: [
+      '=', '<', '>', '@', '^', '|', '&', '+', '-', '*', '/', '$', '%', '!', '~', '?',
+      ':', '.', '->', ';', ':=', '::', '<-',
+    ],
+    symbols: /[=><!~?:&|+\-*/^%@.]+/,
+    escapes: /\\(?:[\\"'ntbr ]|[0-9]{3}|x[0-9A-Fa-f]{2})/,
+    tokenizer: {
+      root: [
+        [/\b[A-Z][\w']*/, 'type.identifier'], // constructeurs et modules
+        [/[a-z_][\w']*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }],
+        { include: '@whitespace' },
+        [/[{}()[\]]/, '@brackets'],
+        [/\d[\d_]*\.\d[\d_]*(?:[eE][+-]?\d+)?/, 'number.float'],
+        [/0[xX][0-9a-fA-F][0-9a-fA-F_]*/, 'number.hex'],
+        [/\d[\d_]*/, 'number'],
+        [/'(?:@escapes|[^\\'])'/, 'string'], // littéral caractère
+        [/'[a-z_][\w']*/, 'type'], // variable de type 'a
+        [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
+        [/@symbols/, { cases: { '@operators': 'operator', '@default': '' } }],
+      ],
+      whitespace: [
+        [/[ \t\r\n]+/, ''],
+        [/\(\*/, { token: 'comment', bracket: '@open', next: '@comment' }],
+      ],
+      comment: [
+        [/[^(*]+/, 'comment'],
+        [/\(\*/, { token: 'comment', bracket: '@open', next: '@push' }], // commentaires imbriqués
+        [/\*\)/, { token: 'comment', bracket: '@close', next: '@pop' }],
+        [/[(*]/, 'comment'],
+      ],
+      string: [
+        [/[^\\"]+/, 'string'],
+        [/@escapes/, 'string.escape'],
+        [/\\./, 'string.escape.invalid'],
+        [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }],
+      ],
+    },
+  });
+}
 
 // Évite de réenregistrer les fournisseurs si Monaco est monté plusieurs fois
 // (plusieurs Workbench sur une page de cours partagent la même instance).
@@ -192,6 +312,8 @@ const registered = new WeakSet<Monaco>();
 export function registerIntellisense(monaco: Monaco): void {
   if (registered.has(monaco)) return;
   registered.add(monaco);
+
+  registerOcaml(monaco);
 
   const Kind = monaco.languages.CompletionItemKind;
   const kindMap = {

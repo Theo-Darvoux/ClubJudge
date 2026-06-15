@@ -1,9 +1,12 @@
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
-# clangd : IntelliSense C/C++ de l'éditeur (proxifié en WebSocket par app/lsp.py).
-# g++ fournit les en-têtes libstdc++ (dont <bits/stdc++.h>) que clangd analyse.
+# Serveurs de langage de l'éditeur, proxifiés en WebSocket par app/lsp.py :
+#   - clangd   : IntelliSense C/C++ (g++ fournit les en-têtes libstdc++, dont
+#                <bits/stdc++.h>, que clangd analyse).
+#   - ocamllsp : IntelliSense OCaml (ocaml-lsp-server ; ocaml apporte la
+#                bibliothèque standard que merlin résout pour la complétion).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends clangd g++ \
+    && apt-get install -y --no-install-recommends clangd g++ ocaml ocaml-lsp-server \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

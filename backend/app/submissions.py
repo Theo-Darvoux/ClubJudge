@@ -83,6 +83,18 @@ class SubmissionOut(BaseModel):
         )
 
 
+class SubmissionDetailOut(SubmissionOut):
+    """Vue détaillée d'une soumission : porte aussi le code source, pour le
+    rappeler dans l'éditeur depuis l'historique (« réutiliser ce code »)."""
+
+    source_code: str
+
+    @classmethod
+    def from_model(cls, s: Submission) -> "SubmissionDetailOut":
+        base = SubmissionOut.from_model(s)
+        return cls(**base.model_dump(), source_code=s.source_code)
+
+
 @router.post("/problems/{slug}/submissions", status_code=status.HTTP_201_CREATED)
 def submit(
     slug: str,
@@ -257,11 +269,11 @@ def get_submission(
     submission_id: int,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
-) -> SubmissionOut:
+) -> SubmissionDetailOut:
     submission = db.get(Submission, submission_id)
     if submission is None or submission.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "submission_not_found")
-    return SubmissionOut.from_model(submission)
+    return SubmissionDetailOut.from_model(submission)
 
 
 @router.get("/problems/{slug}/submissions")

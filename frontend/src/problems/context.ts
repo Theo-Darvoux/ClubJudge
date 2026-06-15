@@ -4,7 +4,6 @@ import type { ProblemSummary, SkillNode } from '../api';
 export interface ProblemsDataValue {
   /** Liste complète des problèmes ; le filtrage de la vue liste est côté client. */
   problems: ProblemSummary[] | null;
-  categories: string[];
   /** Nœuds de l'arbre de compétences. */
   skillTree: SkillNode[] | null;
 }

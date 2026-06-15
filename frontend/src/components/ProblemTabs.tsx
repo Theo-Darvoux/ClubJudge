@@ -4,6 +4,7 @@ import type { Editorial, ProblemDetail, SharedSolution, SubmissionLanguage } fro
 import { useI18n } from '../i18n/context';
 import { Markdown } from './Markdown';
 import { CodeBlock } from './CodeBlock';
+import { CustomSelect } from './CustomSelect';
 
 type TabId = 'statement' | 'hints' | 'editorial' | 'solutions';
 
@@ -12,6 +13,7 @@ const LANGUAGE_LABELS: Record<SubmissionLanguage, string> = {
   python: 'Python',
   c: 'C',
   java: 'Java',
+  ocaml: 'OCaml',
 };
 
 function hintsKey(slug: string) {
@@ -26,6 +28,32 @@ function loadRevealedHints(slug: string, total: number): number {
 export function ProblemTabs({ problem, slug }: { problem: ProblemDetail; slug: string }) {
   const { t, lang } = useI18n();
   const [tab, setTab] = useState<TabId>('statement');
+
+  // Pré-chargement de l'éditorial et des solutions dès que le problème est
+  // résolu — au montage si déjà résolu, ou dès la résolution en direct (quand
+  // `problem.solved` passe à true). Évite le flash de chargement à l'ouverture
+  // des onglets. Les contests ferment ces ressources tant qu'ils sont ouverts.
+  const [editorial, setEditorial] = useState<Editorial | null>(null);
+  const [editorialFailed, setEditorialFailed] = useState(false);
+  const [solutions, setSolutions] = useState<SharedSolution[] | null>(null);
+
+  useEffect(() => {
+    if (!problem.solved || problem.contest) return;
+    let cancelled = false;
+    if (problem.has_editorial) {
+      api
+        .editorial(slug)
+        .then((e) => !cancelled && setEditorial(e))
+        .catch(() => !cancelled && setEditorialFailed(true));
+    }
+    api
+      .solutions(slug)
+      .then((s) => !cancelled && setSolutions(s))
+      .catch(() => !cancelled && setSolutions([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, problem.solved, problem.contest, problem.has_editorial]);
 
   const statement =
     lang === 'en' && problem.statement_en ? problem.statement_en : problem.statement_fr;
@@ -72,8 +100,12 @@ export function ProblemTabs({ problem, slug }: { problem: ProblemDetail; slug: s
         </div>
       )}
       {tab === 'hints' && <HintsPanel slug={slug} hints={problem.hints} />}
-      {tab === 'editorial' && <EditorialPanel slug={slug} solved={problem.solved} />}
-      {tab === 'solutions' && <SolutionsPanel slug={slug} solved={problem.solved} />}
+      {tab === 'editorial' && (
+        <EditorialPanel solved={problem.solved} editorial={editorial} failed={editorialFailed} />
+      )}
+      {tab === 'solutions' && (
+        <SolutionsPanel solved={problem.solved} solutions={solutions} />
+      )}
     </article>
   );
 }
@@ -127,18 +159,16 @@ function LockedPanel({ message }: { message: string }) {
   );
 }
 
-function EditorialPanel({ slug, solved }: { slug: string; solved: boolean }) {
+function EditorialPanel({
+  solved,
+  editorial,
+  failed,
+}: {
+  solved: boolean;
+  editorial: Editorial | null;
+  failed: boolean;
+}) {
   const { t, lang } = useI18n();
-  const [editorial, setEditorial] = useState<Editorial | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!solved) return;
-    api
-      .editorial(slug)
-      .then(setEditorial)
-      .catch(() => setFailed(true));
-  }, [slug, solved]);
 
   if (!solved) return <LockedPanel message={t.problem.editorial_locked} />;
   if (failed) {
@@ -164,19 +194,16 @@ function EditorialPanel({ slug, solved }: { slug: string; solved: boolean }) {
   );
 }
 
-function SolutionsPanel({ slug, solved }: { slug: string; solved: boolean }) {
+function SolutionsPanel({
+  solved,
+  solutions,
+}: {
+  solved: boolean;
+  solutions: SharedSolution[] | null;
+}) {
   const { t } = useI18n();
-  const [solutions, setSolutions] = useState<SharedSolution[] | null>(null);
   const [language, setLanguage] = useState<SubmissionLanguage | 'all'>('all');
   const [sort, setSort] = useState<'time' | 'memory' | 'recent'>('time');
-
-  useEffect(() => {
-    if (!solved) return;
-    api
-      .solutions(slug)
-      .then(setSolutions)
-      .catch(() => setSolutions([]));
-  }, [slug, solved]);
 
   if (!solved) return <LockedPanel message={t.problem.solutions_locked} />;
   if (solutions === null) {
@@ -196,6 +223,17 @@ function SolutionsPanel({ slug, solved }: { slug: string; solved: boolean }) {
     });
   const languages = [...new Set(solutions.map((s) => s.language))];
 
+  // Percentile de vitesse de ma propre solution parmi celles partagées.
+  const timed = solutions.filter((s) => s.time_s != null);
+  const mine = timed.find((s) => s.is_mine);
+  const myPercentile =
+    mine && timed.length > 1
+      ? Math.round(
+          (100 * timed.filter((s) => (s.time_s ?? 0) > (mine.time_s ?? 0)).length) /
+            (timed.length - 1),
+        )
+      : null;
+
   return (
     <div className="tab-panel">
       {solutions.length === 0 ? (
@@ -205,27 +243,25 @@ function SolutionsPanel({ slug, solved }: { slug: string; solved: boolean }) {
           <div className="solutions-bar">
             <p className="hints-intro">{t.problem.solutions_intro}</p>
             <div className="solutions-filters">
-              <select
+              <CustomSelect
                 value={language}
-                onChange={(e) => setLanguage(e.target.value as SubmissionLanguage | 'all')}
-                aria-label={t.problem.th_lang}
-              >
-                <option value="all">{t.problem.all_languages}</option>
-                {languages.map((l) => (
-                  <option key={l} value={l}>
-                    {LANGUAGE_LABELS[l]}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={(val) => setLanguage(val as SubmissionLanguage | 'all')}
+                options={[
+                  { value: 'all', label: t.problem.all_languages },
+                  ...languages.map((l) => ({ value: l, label: LANGUAGE_LABELS[l] })),
+                ]}
+                ariaLabel={t.problem.th_lang}
+              />
+              <CustomSelect
                 value={sort}
-                onChange={(e) => setSort(e.target.value as typeof sort)}
-                aria-label={t.problem.sort_time}
-              >
-                <option value="time">{t.problem.sort_time}</option>
-                <option value="memory">{t.problem.sort_memory}</option>
-                <option value="recent">{t.problem.sort_recent}</option>
-              </select>
+                onChange={(val) => setSort(val as typeof sort)}
+                options={[
+                  { value: 'time', label: t.problem.sort_time },
+                  { value: 'memory', label: t.problem.sort_memory },
+                  { value: 'recent', label: t.problem.sort_recent },
+                ]}
+                ariaLabel={t.problem.sort_time}
+              />
             </div>
           </div>
           {visible.map((s) => (
@@ -234,6 +270,11 @@ function SolutionsPanel({ slug, solved }: { slug: string; solved: boolean }) {
                 <span className="solution-author">
                   {s.author}
                   {s.is_mine && <span className="chip mine-chip">{t.problem.mine_badge}</span>}
+                  {s.is_mine && myPercentile != null && (
+                    <span className="chip percentile-chip">
+                      {t.problem.faster_than(myPercentile)}
+                    </span>
+                  )}
                 </span>
                 <span className="solution-meta mono-label">
                   {LANGUAGE_LABELS[s.language]}

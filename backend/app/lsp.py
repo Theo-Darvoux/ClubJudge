@@ -34,6 +34,7 @@ LANGUAGE_SERVERS: dict[str, tuple[str, list[str]]] = {
     "c": ("clangd", ["--log=error", "--pch-storage=memory", "--background-index=false"]),
     "cpp": ("clangd", ["--log=error", "--pch-storage=memory", "--background-index=false"]),
     "python": ("basedpyright-langserver", ["--stdio"]),
+    "ocaml": ("ocamllsp", []),
 }
 
 

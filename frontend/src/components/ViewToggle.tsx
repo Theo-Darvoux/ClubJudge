@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../i18n/context';
 
@@ -21,7 +22,7 @@ export function ViewToggle() {
  * même point (haut-gauche, position fixe) dans l'arbre et la liste : la bascule
  * Arbre/Liste ne bouge plus d'un pixel d'une vue à l'autre.
  */
-export function ProblemsHeader({ overline }: { overline: string }) {
+export function ProblemsHeader({ overline, children }: { overline: string; children?: ReactNode }) {
   const { t } = useI18n();
   return (
     <header className="problems-head floating">
@@ -29,6 +30,7 @@ export function ProblemsHeader({ overline }: { overline: string }) {
         <p className="mono-label">{overline}</p>
         <h1>{t.skills.title}</h1>
       </div>
+      {children}
       <ViewToggle />
     </header>
   );

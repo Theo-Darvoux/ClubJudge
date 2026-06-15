@@ -16,7 +16,6 @@ import { ProblemsDataContext } from './context';
  */
 export function ProblemsDataProvider() {
   const [problems, setProblems] = useState<ProblemSummary[] | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
   const [skillTree, setSkillTree] = useState<SkillNode[] | null>(null);
 
   useEffect(() => {
@@ -25,10 +24,6 @@ export function ProblemsDataProvider() {
       .problems({})
       .then((p) => !cancelled && setProblems(p))
       .catch(() => !cancelled && setProblems([]));
-    api
-      .categories()
-      .then((c) => !cancelled && setCategories(c))
-      .catch(() => {});
     api
       .skillTree()
       .then((t) => !cancelled && setSkillTree(t))
@@ -39,7 +34,7 @@ export function ProblemsDataProvider() {
   }, []);
 
   return (
-    <ProblemsDataContext.Provider value={{ problems, categories, skillTree }}>
+    <ProblemsDataContext.Provider value={{ problems, skillTree }}>
       <Outlet />
     </ProblemsDataContext.Provider>
   );

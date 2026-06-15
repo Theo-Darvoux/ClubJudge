@@ -195,7 +195,7 @@ export interface ContestPayload {
   problems: { slug: string; label: string }[];
 }
 
-export type SubmissionLanguage = 'cpp' | 'python' | 'c' | 'java';
+export type SubmissionLanguage = 'cpp' | 'python' | 'c' | 'java' | 'ocaml';
 
 export type Verdict = 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE' | 'CE' | 'IE';
 
@@ -225,6 +225,9 @@ export interface Submission {
   compile_output: string | null;
   failed_test: number | null;
   created_at: string;
+  // Présent seulement sur le détail d'une soumission (GET /submissions/:id),
+  // pas dans la liste d'historique — sert à recharger le code dans l'éditeur.
+  source_code?: string;
 }
 
 export class ApiError extends Error {
@@ -288,7 +291,6 @@ export const api = {
     const qs = search.toString();
     return request<ProblemSummary[]>(`/api/problems${qs ? `?${qs}` : ''}`);
   },
-  categories: () => request<string[]>('/api/problems/categories'),
   skillTree: () => request<SkillNode[]>('/api/skills/tree'),
   problem: (slug: string) => request<ProblemDetail>(`/api/problems/${slug}`),
 

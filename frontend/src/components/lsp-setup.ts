@@ -688,3 +688,14 @@ export function loadPyright(monaco: Monaco): Promise<WsLspClient> {
     },
   });
 }
+
+/** ocamllsp (merlin) côté serveur — IntelliSense OCaml. */
+export function loadOcaml(monaco: Monaco): Promise<WsLspClient> {
+  return load(monaco, {
+    name: 'ocamllsp',
+    wsPath: '/api/lsp/ocaml',
+    languages: ['ocaml'],
+    docInfo: () => ({ ext: 'ml', languageId: 'ocaml' }),
+    completionTriggerCharacters: ['.', '#', '~', '`'],
+  });
+}

@@ -7,6 +7,7 @@ class Language(StrEnum):
     CPP = "cpp"
     PYTHON = "python"
     JAVA = "java"
+    OCAML = "ocaml"
 
 
 class Verdict(StrEnum):

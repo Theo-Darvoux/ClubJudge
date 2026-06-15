@@ -20,6 +20,7 @@ LANGUAGE_IDS: dict[Language, int] = {
     Language.CPP: 54,  # C++ (GCC 9.2.0)
     Language.PYTHON: 71,  # Python (3.8.1)
     Language.JAVA: 62,  # Java (OpenJDK 13.0.1)
+    Language.OCAML: 65,  # OCaml (4.09.0)
 }
 
 # Judge0 status ids → our verdicts. 1/2 (queued/processing) are not final.

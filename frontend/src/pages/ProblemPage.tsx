@@ -4,6 +4,7 @@ import { api } from '../api';
 import type { ProblemDetail } from '../api';
 import { DifficultyDots } from '../components/badges';
 import { ProblemTabs } from '../components/ProblemTabs';
+import { SolveCelebration } from '../components/SolveCelebration';
 import { Workbench } from '../components/Workbench';
 import { fmtCountdown, useNow } from '../contest-utils';
 import { useI18n } from '../i18n/context';
@@ -26,9 +27,24 @@ function ProblemView({ slug }: { slug: string }) {
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [hideStatement, setHideStatement] = useState(false);
+  const [celebrate, setCelebrate] = useState(false);
+  const [attempts, setAttempts] = useState<number | null>(null);
 
   const toggleStatement = () => {
     setHideStatement((prev) => !prev);
+  };
+
+  const handleSolved = (count: number) => {
+    setAttempts(count);
+    setProblem((p) => {
+      // Première résolution (transition non-résolu → résolu) : on fête et on
+      // mémorise le nombre d'essais pour le badge persistant.
+      if (p && !p.solved) {
+        localStorage.setItem(`clubjudge.solvedAttempts.${slug}`, String(count));
+        setCelebrate(true);
+      }
+      return p ? { ...p, solved: true, attempted: true } : p;
+    });
   };
 
   useEffect(() => {
@@ -46,6 +62,9 @@ function ProblemView({ slug }: { slug: string }) {
     );
   }
   if (!problem) return <p className="mono-label">{t.problems.loading}</p>;
+
+  const solvedAttempts =
+    attempts ?? (Number(localStorage.getItem(`clubjudge.solvedAttempts.${slug}`)) || 0);
 
   return (
     <div className="problem-page">
@@ -81,14 +100,25 @@ function ProblemView({ slug }: { slug: string }) {
               ✓ {t.problems.solved}
             </span>
           )}
+          {problem.solved && solvedAttempts > 0 && (
+            <span className="attempt-chip" title={t.problem.attempt_badge_title}>
+              {solvedAttempts === 1
+                ? t.problem.first_try
+                : t.problem.solved_in_tries(solvedAttempts)}
+            </span>
+          )}
         </h1>
         <div className="problem-meta">
           <DifficultyDots level={problem.difficulty} />
-          <span className="chip">{problem.category}</span>
           {problem.tags.map((tag) => (
-            <span key={tag} className="chip">
+            <Link
+              key={tag}
+              to={`/problems/list?tag=${encodeURIComponent(tag)}`}
+              className="chip chip-link"
+              title={t.problem.tag_explore(tag)}
+            >
               {tag}
-            </span>
+            </Link>
           ))}
           <span className="limits">
             {t.problem.time_limit} {problem.time_limit_s} s · {t.problem.memory_limit}{' '}
@@ -135,13 +165,16 @@ function ProblemView({ slug }: { slug: string }) {
 
       <div className={`problem-columns ${hideStatement ? 'problem-columns--single' : ''}`}>
         {!hideStatement && <ProblemTabs problem={problem} slug={slug} />}
-        <Workbench
-          slug={slug}
-          onSolved={() =>
-            setProblem((p) => (p ? { ...p, solved: true, attempted: true } : p))
-          }
-        />
+        <Workbench slug={slug} samples={problem.samples} onSolved={handleSolved} />
       </div>
+
+      {celebrate && (
+        <SolveCelebration
+          problem={problem}
+          attempts={attempts}
+          onClose={() => setCelebrate(false)}
+        />
+      )}
     </div>
   );
 }

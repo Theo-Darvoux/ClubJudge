@@ -4,7 +4,7 @@ import { useI18n } from '../i18n/context';
 export function DifficultyDots({ level }: { level: number }) {
   const { t } = useI18n();
   return (
-    <span className="difficulty" title={t.difficulty[level]}>
+    <span className="difficulty" data-level={level} title={t.difficulty[level]}>
       <span className="difficulty-dots" aria-hidden="true">
         {[1, 2, 3, 4, 5].map((i) => (
           <span key={i} className={i <= level ? 'dot is-on' : 'dot'} />
