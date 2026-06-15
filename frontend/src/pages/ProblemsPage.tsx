@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { DifficultyDots, StatusMark } from '../components/badges';
+import type { ProblemSummary } from '../api';
+import { DifficultyDots, DifficultyDotsInner, StatusMark } from '../components/badges';
+import { CustomSelect } from '../components/CustomSelect';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { ProblemsHeader } from '../components/ViewToggle';
+import { cx } from '../cx';
 import { useI18n } from '../i18n/context';
 import { useProblemsData } from '../problems/context';
+import { LEVELS, problemStatus } from '../problems/status';
 
 type SortKey = 'default' | 'title' | 'difficulty';
 type SortDir = 'asc' | 'desc';
@@ -12,97 +16,276 @@ type StatusFilter = 'all' | 'todo' | 'attempted' | 'solved';
 
 const STATUS_FILTERS: StatusFilter[] = ['all', 'todo', 'attempted', 'solved'];
 const SORT_KEYS: SortKey[] = ['default', 'title', 'difficulty'];
-const LEVELS = [1, 2, 3, 4, 5];
+
+interface ProblemCardProps {
+  p: ProblemSummary;
+  number: number;
+  recommended: boolean;
+  state: 'solved' | 'attempted' | 'todo';
+  selectedTag: string | null;
+  toggleTag: (tag: string) => void;
+}
+
+const ProblemCard = memo(function ProblemCard({
+  p,
+  number,
+  recommended,
+  state,
+  selectedTag,
+  toggleTag,
+}: ProblemCardProps) {
+  const { t } = useI18n();
+  return (
+    <div
+      className={cx(
+        'problem-card',
+        state === 'solved' && 'is-solved',
+        state === 'attempted' && 'is-attempted',
+        recommended && 'is-recommended',
+      )}
+    >
+      {/* Couverture « plein carte » : un clic n'importe où ouvre le
+          problème, sans imbriquer les puces interactives dans une
+          ancre. Décorative et hors tabulation — c'est le titre qui
+          porte le lien accessible et reste sélectionnable, par-dessus
+          la couverture (voir z-index). */}
+      <Link
+        to={`/problems/${p.slug}`}
+        className="pcard-cover"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+
+      <span className="pcard-rail">
+        <span className="pcard-index">
+          {String(number).padStart(2, '0')}
+        </span>
+        <StatusMark solved={p.solved} attempted={p.attempted} />
+      </span>
+
+      <div className="pcard-top">
+        <Link to={`/problems/${p.slug}`} className="pcard-title">
+          {p.title}
+        </Link>
+        <span className="pcard-diff">
+          <DifficultyDots level={p.difficulty} />
+        </span>
+      </div>
+
+      <div className="pcard-meta">
+        {p.tags.map((tag) => (
+          <button
+            key={tag}
+            type="button"
+            className={cx('chip', 'clickable-tag-chip', selectedTag === tag && 'is-active')}
+            onClick={() => toggleTag(tag)}
+          >
+            {tag}
+          </button>
+        ))}
+
+        <span className="pcard-flag">
+          {recommended ? (
+            <span className="recommended-badge">{t.problems.recommended} →</span>
+          ) : state === 'solved' ? (
+            <span className="flag-solved">{t.problems.solved}</span>
+          ) : state === 'attempted' ? (
+            <span className="flag-attempted">{t.problems.attempted}</span>
+          ) : null}
+        </span>
+      </div>
+    </div>
+  );
+});
 
 export function ProblemsPage() {
   const { t, lang } = useI18n();
   const navigate = useNavigate();
   // Données partagées avec la vue arbre (chargées une seule fois par le provider) :
   // tout le filtrage de la liste se fait donc côté client, sans aller-retour réseau.
-  const { problems, skillTree } = useProblemsData();
+  const { problems, skillTree, error, reload, solvedProblems, totalProblems } = useProblemsData();
 
   // État des filtres porté par l'URL : il survit à un aller-retour vers un
   // problème (le provider est démonté entre-temps) et rend les vues partageables.
   // Les liens « tag » depuis la page d'un problème ouvrent donc la liste déjà
   // filtrée sur ce tag (?tag=…), exactement comme un clic sur une puce ici.
   const [searchParams, setSearchParams] = useSearchParams();
-  const [difficulty, setDifficulty] = useState(() => Number(searchParams.get('diff')) || 0);
-  const [query, setQuery] = useState(() => searchParams.get('q') ?? '');
-  const [selectedTag, setSelectedTag] = useState<string | null>(() => searchParams.get('tag'));
-  const [status, setStatus] = useState<StatusFilter>(() => {
+
+  // 1. URL search parameters as single source of truth
+  const difficulty = useMemo(() => {
+    const d = Number(searchParams.get('diff'));
+    return LEVELS.includes(d) ? d : 0;
+  }, [searchParams]);
+
+  const status = useMemo(() => {
     const s = searchParams.get('status') as StatusFilter;
     return STATUS_FILTERS.includes(s) ? s : 'all';
-  });
-  const [sortKey, setSortKey] = useState<SortKey>(() => {
+  }, [searchParams]);
+
+  const sortKey = useMemo(() => {
     const s = searchParams.get('sort') as SortKey;
     return SORT_KEYS.includes(s) ? s : 'default';
-  });
-  const [sortDir, setSortDir] = useState<SortDir>(() =>
-    searchParams.get('dir') === 'desc' ? 'desc' : 'asc',
-  );
+  }, [searchParams]);
 
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const sortDir = useMemo<SortDir>(() => {
+    return searchParams.get('dir') === 'desc' ? 'desc' : 'asc';
+  }, [searchParams]);
 
-  // Sérialise l'état des filtres dans l'URL (remplacement : pas une entrée
-  // d'historique par frappe). Tout défaut est omis pour garder l'URL propre.
+  // 2. Input search query state with debounced sync to URL
+  const [query, setQuery] = useState(() => searchParams.get('q') ?? '');
+  const urlQ = searchParams.get('q') ?? '';
+
+  // Track what we last wrote to the URL to avoid feedback loops/flickering
+  const lastWrittenQueryRef = useRef(urlQ);
+
+  // Sync search input if URL changes (e.g. back/forward navigation)
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (query) params.set('q', query);
-    if (selectedTag) params.set('tag', selectedTag);
-    if (difficulty) params.set('diff', String(difficulty));
-    if (status !== 'all') params.set('status', status);
-    if (sortKey !== 'default') params.set('sort', sortKey);
-    if (sortDir !== 'asc') params.set('dir', sortDir);
-    setSearchParams(params, { replace: true });
-  }, [query, selectedTag, difficulty, status, sortKey, sortDir, setSearchParams]);
+    if (urlQ !== lastWrittenQueryRef.current) {
+      lastWrittenQueryRef.current = urlQ;
+      setQuery(urlQ);
+    }
+  }, [urlQ]);
 
-  // Numéro stable par problème : position dans l'ordre d'origine de l'API, donc
-  // indépendant des filtres/tri courants (un vrai repère, pas un rang d'affichage).
+  // Use a ref for searchParams to avoid resetting the debounce timer on unrelated filter changes
+  const searchParamsRef = useRef(searchParams);
+  useEffect(() => {
+    searchParamsRef.current = searchParams;
+  }, [searchParams]);
+
+  // Debounce writing the search query to the URL
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const currentUrlQ = searchParamsRef.current.get('q') ?? '';
+      if (query !== currentUrlQ) {
+        const next = new URLSearchParams(searchParamsRef.current);
+        if (query) {
+          next.set('q', query);
+        } else {
+          next.delete('q');
+        }
+        lastWrittenQueryRef.current = query;
+        setSearchParams(next, { replace: true });
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [query, setSearchParams]);
+
+  // Helper to update URL params using functional updater to avoid dependency on searchParams
+  const updateParam = useCallback((key: string, value: string | null) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (
+        value === null ||
+        value === '' ||
+        value === 'all' ||
+        (key === 'diff' && value === '0') ||
+        (key === 'sort' && value === 'default')
+      ) {
+        next.delete(key);
+        if (key === 'sort') {
+          next.delete('dir');
+        }
+      } else {
+        next.set(key, value);
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  // Numéro stable + liste des tags : tout ce qui ne dépend que de la liste
+  // complète (indépendant des filtres) en un seul passage.
+  // Numéro stable des problèmes : indépendant de la langue et des filtres
   const numberBySlug = useMemo(() => {
+    const list = problems ?? [];
     const map = new Map<string, number>();
-    (problems ?? []).forEach((p, i) => map.set(p.slug, i + 1));
+    list.forEach((p, i) => {
+      map.set(p.slug, i + 1);
+    });
     return map;
   }, [problems]);
 
-  // Progression globale = problèmes résolus sur le total. La jauge ET le libellé
-  // parlent désormais de la même chose (plus de mélange skills/problèmes).
+  // Liste ordonnée de tous les tags du catalogue
+  const allTags = useMemo(() => {
+    const list = problems ?? [];
+    const tagsSet = new Set<string>();
+    list.forEach((p) => {
+      for (const tag of p.tags) tagsSet.add(tag);
+    });
+    return Array.from(tagsSet).sort((a, b) => a.localeCompare(b, lang));
+  }, [problems, lang]);
+
+  // Tag sélectionné (valeur validée par rapport aux tags du catalogue pour éviter les tags obsolètes)
+  const selectedTag = useMemo(() => {
+    const tag = searchParams.get('tag');
+    if (!tag) return null;
+    if (problems && !allTags.includes(tag)) {
+      return null;
+    }
+    return tag;
+  }, [searchParams, problems, allTags]);
+
+  const [visibleLimit, setVisibleLimit] = useState(40);
+
+  // Ajustement de l'état pendant le rendu pour éviter l'avertissement de cascade d'effets (react-hooks/set-state-in-effect)
+  const filterKey = `${query}_${selectedTag ?? ''}_${difficulty}_${status}_${sortKey}_${sortDir}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setVisibleLimit(40);
+  }
+
+  // Progression globale (résolus/total partagés avec la vue arbre via le
+  // provider). null quand le catalogue est vide : sert aussi à masquer les
+  // contrôles tant qu'il n'y a rien à filtrer.
   const progress = useMemo(() => {
-    if (!problems || problems.length === 0) return null;
-    const solvedProblems = problems.reduce((n, p) => n + (p.solved ? 1 : 0), 0);
-    const totalProblems = problems.length;
+    if (totalProblems === 0) return null;
     return {
       solvedProblems,
       totalProblems,
       pct: Math.round((solvedProblems / totalProblems) * 100),
     };
-  }, [problems]);
+  }, [solvedProblems, totalProblems]);
 
-  // Résolus / total par niveau de difficulté — petit tableau de bord ludique,
-  // chaque pastille filtre aussi la liste sur ce niveau.
-  const difficultyStats = useMemo(() => {
-    return LEVELS.map((level) => {
-      let solved = 0;
-      let total = 0;
-      for (const p of problems ?? []) {
-        if (p.difficulty !== level) continue;
-        total += 1;
-        if (p.solved) solved += 1;
-      }
-      return { level, solved, total };
-    });
-  }, [problems]);
-
-  // Compteurs par état, pour annoter le filtre segmenté (Tous · À faire · …).
+  // Prédicats de filtre, réutilisés par la liste visible ET les compteurs à
+  // facettes. Chaque groupe de compteurs applique tous les filtres SAUF sa
+  // propre dimension, pour montrer « ce que donnerait ce choix » plutôt qu'un
+  // total global figé (recherche à facettes).
+  const q = query.trim().toLowerCase();
+  // Compteurs du filtre segmenté : recherche + tag + difficulté (pas le statut,
+  // sa propre dimension) — ils reflètent donc la difficulté/tag sélectionnés.
   const statusCounts = useMemo(() => {
     const counts: Record<StatusFilter, number> = { all: 0, todo: 0, attempted: 0, solved: 0 };
     for (const p of problems ?? []) {
-      counts.all += 1;
-      if (p.solved) counts.solved += 1;
-      else if (p.attempted) counts.attempted += 1;
-      else counts.todo += 1;
+      const matchQ = !q || p.title.toLowerCase().includes(q) || p.tags.some((tag) => tag.toLowerCase().includes(q));
+      const matchT = !selectedTag || p.tags.includes(selectedTag);
+      const matchD = !difficulty || p.difficulty === difficulty;
+      if (matchQ && matchT && matchD) {
+        counts.all += 1;
+        counts[problemStatus(p)] += 1;
+      }
     }
     return counts;
-  }, [problems]);
+  }, [problems, q, selectedTag, difficulty]);
+
+  // Pastilles de difficulté (résolus/total par niveau) : recherche + tag
+  // seulement. On exclut le filtre de statut à dessein — sinon, sous « Résolus »,
+  // total = résolus et toutes les pastilles passeraient « complètes ».
+  const difficultyStats = useMemo(() => {
+    const stats = LEVELS.map((level) => ({ level, solved: 0, total: 0 }));
+    for (const p of problems ?? []) {
+      const matchQ = !q || p.title.toLowerCase().includes(q) || p.tags.some((tag) => tag.toLowerCase().includes(q));
+      const matchT = !selectedTag || p.tags.includes(selectedTag);
+      if (matchQ && matchT) {
+        // Les niveaux vont de 1 à 5 et `stats` est indexé de 0 à 4.
+        const bucket = stats[p.difficulty - 1];
+        if (bucket) {
+          bucket.total += 1;
+          if (p.solved) bucket.solved += 1;
+        }
+      }
+    }
+    return stats;
+  }, [problems, q, selectedTag]);
 
   // Problèmes rattachés à un nœud « recommandé » dans l'arbre : on les met en
   // avant dans la liste pour guider l'utilisateur vers son prochain pas.
@@ -118,44 +301,24 @@ export function ProblemsPage() {
     return set;
   }, [skillTree]);
 
-  const allTags = useMemo(() => {
-    if (!problems) return [];
-    const tagsSet = new Set<string>();
-    for (const p of problems) {
-      for (const tag of p.tags) {
-        tagsSet.add(tag);
-      }
-    }
-    return Array.from(tagsSet).sort();
-  }, [problems]);
-
   const visible = useMemo(() => {
     if (!problems) return null;
-    const q = query.trim().toLowerCase();
     const filtered = problems.filter((p) => {
-      const matchStatus =
-        status === 'all'
-          ? true
-          : status === 'solved'
-            ? p.solved
-            : status === 'attempted'
-              ? p.attempted && !p.solved
-              : !p.solved && !p.attempted;
-      return (
-        matchStatus &&
-        (!difficulty || p.difficulty === difficulty) &&
-        (!selectedTag || p.tags.includes(selectedTag)) &&
-        (!q ||
-          p.title.toLowerCase().includes(q) ||
-          p.tags.some((tag) => tag.toLowerCase().includes(q)))
-      );
+      const matchQ = !q || p.title.toLowerCase().includes(q) || p.tags.some((tag) => tag.toLowerCase().includes(q));
+      const matchT = !selectedTag || p.tags.includes(selectedTag);
+      const matchD = !difficulty || p.difficulty === difficulty;
+      const matchS = status === 'all' || problemStatus(p) === status;
+      return matchS && matchD && matchT && matchQ;
     });
+
+    // `filtered` est déjà un tableau neuf (issu de .filter) : on peut le trier
+    // en place sans copie supplémentaire ni risque de muter `problems`.
 
     // Tri par défaut : les problèmes recommandés remontent en tête de liste
     // (le « prochain pas » naturel), puis l'ordre API est conservé. Sinon on
     // applique la clé de tri choisie dans le menu.
     if (sortKey === 'default') {
-      return [...filtered].sort((a, b) => {
+      return filtered.sort((a, b) => {
         const ra = recommendedSlugs.has(a.slug) ? 0 : 1;
         const rb = recommendedSlugs.has(b.slug) ? 0 : 1;
         return ra - rb;
@@ -163,7 +326,7 @@ export function ProblemsPage() {
     }
 
     const dir = sortDir === 'asc' ? 1 : -1;
-    return [...filtered].sort((a, b) => {
+    return filtered.sort((a, b) => {
       switch (sortKey) {
         case 'title':
           return dir * a.title.localeCompare(b.title, lang);
@@ -173,7 +336,7 @@ export function ProblemsPage() {
           return 0;
       }
     });
-  }, [problems, query, difficulty, selectedTag, status, sortKey, sortDir, lang, recommendedSlugs]);
+  }, [problems, q, selectedTag, difficulty, status, sortKey, sortDir, lang, recommendedSlugs]);
 
   // Ouvre un problème non résolu au hasard parmi la sélection filtrée (et à
   // défaut n'importe lequel) — le « je ne sais pas quoi faire, surprends-moi ».
@@ -186,36 +349,31 @@ export function ProblemsPage() {
   }, [visible, navigate]);
 
   const hasActiveFilters =
-    query !== '' || selectedTag !== null || difficulty !== 0 || status !== 'all';
+    query !== '' ||
+    selectedTag !== null ||
+    difficulty !== 0 ||
+    status !== 'all' ||
+    sortKey !== 'default' ||
+    searchParams.has('dir');
 
   const clearFilters = () => {
     setQuery('');
-    setSelectedTag(null);
-    setDifficulty(0);
-    setStatus('all');
+    lastWrittenQueryRef.current = '';
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('q');
+      next.delete('tag');
+      next.delete('diff');
+      next.delete('status');
+      next.delete('sort');
+      next.delete('dir');
+      return next;
+    }, { replace: true });
   };
 
-  const toggleTag = (tag: string) => setSelectedTag((cur) => (cur === tag ? null : tag));
-
-  // Raccourcis clavier : « / » place le curseur dans la recherche, « r » ouvre
-  // un problème au hasard. On laisse passer les combos navigateur (Ctrl+R…).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) {
-        return;
-      }
-      if (e.key === '/') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      } else if (e.key === 'r' || e.key === 'R') {
-        pickRandom();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [pickRandom]);
+  const toggleTag = useCallback((tag: string) => {
+    updateParam('tag', selectedTag === tag ? null : tag);
+  }, [selectedTag, updateParam]);
 
   const statusLabel: Record<StatusFilter, string> = {
     all: t.problems.status_all,
@@ -226,9 +384,14 @@ export function ProblemsPage() {
 
   // Compteur affiché dans l'en-tête flottant (même emplacement que l'overline
   // de l'arbre) — la bascule Arbre/Liste reste donc parfaitement immobile.
-  const overline = visible
-    ? `${visible.length} ${visible.length > 1 ? t.problems.count_many : t.problems.count_one}`
-    : t.problems.loading;
+  // Pluriel selon la langue : l'anglais singularise seulement n === 1
+  // (« 0 problems »), le français aussi pour 0 et 1 (« 0 problème »).
+  const overline = (() => {
+    if (!visible) return t.problems.loading;
+    const n = visible.length;
+    const plural = lang === 'en' ? n !== 1 : n > 1;
+    return `${n} ${plural ? t.problems.count_many : t.problems.count_one}`;
+  })();
 
   return (
     <div className="problems-fullscreen">
@@ -266,16 +429,16 @@ export function ProblemsPage() {
                 key={s.level}
                 type="button"
                 data-level={s.level}
-                className={`diff-stat${difficulty === s.level ? ' is-active' : ''}${
-                  s.total > 0 && s.solved === s.total ? ' is-complete' : ''
-                }`}
-                onClick={() => setDifficulty((d) => (d === s.level ? 0 : s.level))}
+                className={cx(
+                  'diff-stat',
+                  difficulty === s.level && 'is-active',
+                  s.total > 0 && s.solved === s.total && 'is-complete',
+                )}
+                onClick={() => updateParam('diff', difficulty === s.level ? null : String(s.level))}
                 aria-pressed={difficulty === s.level}
               >
                 <span className="diff-stat-dots" aria-hidden="true">
-                  {LEVELS.map((i) => (
-                    <span key={i} className={i <= s.level ? 'dot is-on' : 'dot'} />
-                  ))}
+                  <DifficultyDotsInner level={s.level} />
                 </span>
                 <span className="diff-stat-name">{t.difficulty[s.level]}</span>
                 <span className="diff-stat-count mono-label">
@@ -286,7 +449,10 @@ export function ProblemsPage() {
           </div>
         )}
 
-        {/* Barre de filtres + tri, collée en haut au défilement. */}
+        {/* Barre de filtres + tri (défile avec la liste). Masquée tant qu'il n'y
+            a pas de catalogue à filtrer — chargement, erreur ou liste vide —
+            comme la barre de progression et les pastilles de difficulté. */}
+        {progress && (
         <div className="filters-bar">
           <div className="filters">
             <div className="filter-search-wrapper">
@@ -295,10 +461,10 @@ export function ProblemsPage() {
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
               <input
-                ref={searchInputRef}
                 type="text"
                 className="filter-search"
                 placeholder={t.problems.search_placeholder}
+                aria-label={t.problems.search_placeholder}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -306,7 +472,11 @@ export function ProblemsPage() {
                 <button
                   type="button"
                   className="search-clear-btn"
-                  onClick={() => setQuery('')}
+                  onClick={() => {
+                    setQuery('');
+                    lastWrittenQueryRef.current = '';
+                    updateParam('q', null);
+                  }}
                   aria-label={t.problems.clear_search}
                 >
                   ✕
@@ -316,7 +486,7 @@ export function ProblemsPage() {
 
             <SearchableSelect
               value={selectedTag ?? ''}
-              onChange={(val) => setSelectedTag(val ? String(val) : null)}
+              onChange={(val) => updateParam('tag', val ? String(val) : null)}
               options={[
                 { value: '', label: t.problems.all_tags },
                 ...allTags.map((tag) => ({ value: tag, label: tag })),
@@ -326,9 +496,9 @@ export function ProblemsPage() {
             />
 
             <div className="sort-control">
-              <SearchableSelect
+              <CustomSelect
                 value={sortKey}
-                onChange={(val) => setSortKey(val as SortKey)}
+                onChange={(val) => updateParam('sort', val as SortKey)}
                 options={[
                   { value: 'default', label: t.problems.sort_default },
                   { value: 'title', label: t.problems.sort_title },
@@ -339,7 +509,7 @@ export function ProblemsPage() {
               <button
                 type="button"
                 className="sort-dir-btn"
-                onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                onClick={() => updateParam('dir', sortDir === 'asc' ? 'desc' : 'asc')}
                 disabled={sortKey === 'default'}
                 title={t.problems.sort_dir}
                 aria-label={t.problems.sort_dir}
@@ -372,8 +542,8 @@ export function ProblemsPage() {
                 <button
                   key={s}
                   type="button"
-                  className={`seg-btn${status === s ? ' is-active' : ''}`}
-                  onClick={() => setStatus(s)}
+                  className={cx('seg-btn', status === s && 'is-active')}
+                  onClick={() => updateParam('status', s)}
                   aria-pressed={status === s}
                 >
                   {statusLabel[s]}
@@ -392,6 +562,7 @@ export function ProblemsPage() {
                 type="button"
                 className="btn-random"
                 onClick={pickRandom}
+                disabled={!visible || visible.length === 0}
                 title={t.problems.random_title}
               >
                 <span aria-hidden="true">🎲</span> {t.problems.random}
@@ -399,10 +570,25 @@ export function ProblemsPage() {
             </div>
           </div>
         </div>
+        )}
 
-        {!visible ? (
+        {problems === null ? (
           <p className="mono-label">{t.problems.loading}</p>
-        ) : visible.length === 0 ? (
+        ) : error ? (
+          /* Échec réseau / serveur — distinct d'un catalogue vide : on propose
+             un vrai « réessayer » qui relance le chargement partagé. */
+          <div className="empty-state-container">
+            <p className="empty-state">{t.problems.load_error}</p>
+            <button type="button" className="btn-clear-filters" onClick={reload}>
+              <span aria-hidden="true">↻</span> {t.problems.retry}
+            </button>
+          </div>
+        ) : problems.length === 0 ? (
+          /* Catalogue réellement vide (aucun problème publié), sans filtre en cause. */
+          <div className="empty-state-container">
+            <p className="empty-state">{t.problems.empty_catalogue}</p>
+          </div>
+        ) : visible?.length === 0 ? (
           <div className="empty-state-container">
             <p className="empty-state">{t.problems.empty}</p>
             {hasActiveFilters && (
@@ -412,70 +598,36 @@ export function ProblemsPage() {
             )}
           </div>
         ) : (
-          <div className="problem-cards">
-            {visible.map((p) => {
-              const recommended = recommendedSlugs.has(p.slug);
-              return (
-                <div
-                  key={p.slug}
-                  className={[
-                    'problem-card',
-                    p.solved ? 'is-solved' : '',
-                    p.attempted && !p.solved ? 'is-attempted' : '',
-                    recommended ? 'is-recommended' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                >
-                  {/* Lien « plein carte » : un clic n'importe où ouvre le
-                      problème, sans imbriquer les puces interactives dans une
-                      ancre (les chips de tag restent au-dessus, voir z-index). */}
-                  <Link
-                    to={`/problems/${p.slug}`}
-                    className="pcard-cover"
-                    aria-label={p.title}
+          <>
+            <div className="problem-cards">
+              {visible?.slice(0, visibleLimit).map((p) => {
+                const recommended = recommendedSlugs.has(p.slug);
+                const state = problemStatus(p);
+                return (
+                  <ProblemCard
+                    key={p.slug}
+                    p={p}
+                    number={numberBySlug.get(p.slug) ?? 0}
+                    recommended={recommended}
+                    state={state}
+                    selectedTag={selectedTag}
+                    toggleTag={toggleTag}
                   />
-
-                  <span className="pcard-rail">
-                    <span className="pcard-index">
-                      {String(numberBySlug.get(p.slug) ?? 0).padStart(2, '0')}
-                    </span>
-                    <StatusMark solved={p.solved} attempted={p.attempted} />
-                  </span>
-
-                  <div className="pcard-top">
-                    <span className="pcard-title">{p.title}</span>
-                    <span className="pcard-diff">
-                      <DifficultyDots level={p.difficulty} />
-                    </span>
-                  </div>
-
-                  <div className="pcard-meta">
-                    {p.tags.map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        className={`chip clickable-tag-chip${selectedTag === tag ? ' is-active' : ''}`}
-                        onClick={() => toggleTag(tag)}
-                      >
-                        {tag}
-                      </button>
-                    ))}
-
-                    <span className="pcard-flag">
-                      {recommended ? (
-                        <span className="recommended-badge">{t.problems.recommended} →</span>
-                      ) : p.solved ? (
-                        <span className="flag-solved">{t.problems.solved}</span>
-                      ) : p.attempted ? (
-                        <span className="flag-attempted">{t.problems.attempted}</span>
-                      ) : null}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+            {visible && visible.length > visibleLimit && (
+              <div className="load-more-container">
+                <button
+                  type="button"
+                  className="btn-load-more"
+                  onClick={() => setVisibleLimit((prev) => prev + 40)}
+                >
+                  {t.problems.load_more} ({visible.length - visibleLimit})
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -27,9 +27,7 @@ def _set_role(email: str, role: Role) -> int:
 
 def _list_admins() -> int:
     with SessionLocal() as db:
-        admins = db.scalars(
-            select(User).where(User.role == Role.ADMIN).order_by(User.email)
-        ).all()
+        admins = db.scalars(select(User).where(User.role == Role.ADMIN).order_by(User.email)).all()
     if not admins:
         print("Aucun admin — utilisez `clubjudge-admin promote <email>`.")
     for user in admins:

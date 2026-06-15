@@ -60,7 +60,11 @@ export const en: typeof fr = {
     count_one: 'problem',
     count_many: 'problems',
     empty: 'No problem matches these filters.',
+    empty_catalogue: 'No problems yet — they will appear here soon.',
+    load_error: 'Could not load the problems.',
+    retry: 'Retry',
     loading: 'loading…',
+    load_more: 'Load more',
   },
   skills: {
     title: 'Problems',
@@ -72,14 +76,11 @@ export const en: typeof fr = {
       recommended: 'Recommended',
       not_ready: 'To explore',
     },
-    soft_unlock: 'Nothing is locked — the tree recommends, you choose.',
     progress_overline: 'Progress',
-    skills_mastered: (n: number, m: number) => `${n} / ${m} skill${m > 1 ? 's' : ''} mastered`,
+    mastered_label: 'skills mastered',
     problems_solved: (n: number, m: number) => `${n} / ${m} problem${m > 1 ? 's' : ''} solved`,
-    panel_hint: 'Click a node to see its problems.',
     mastery_progress: (n: number, m: number) => `${n} solved out of ${m} to master`,
     prerequisites: 'Prerequisites',
-    node_problems: 'Node problems',
     empty:
       'The skill tree is not defined yet (content/skills.yaml). ' +
       'The problem list is still available.',
@@ -90,8 +91,6 @@ export const en: typeof fr = {
     recenter: 'Recenter',
     close_panel: 'Close',
     explore_hint: 'Drag to explore · scroll to zoom',
-    search_placeholder: 'Search for a skill…',
-    search_empty: 'No skills found',
   },
   courses: {
     title: 'Courses',

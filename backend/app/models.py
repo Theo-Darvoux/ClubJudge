@@ -12,7 +12,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, query_expression, relationship
 
 from app.db import Base
 
@@ -59,7 +59,7 @@ class Problem(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     slug: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     title: Mapped[str] = mapped_column(String(128))
-    category: Mapped[str] = mapped_column(String(64), index=True)
+    category: Mapped[str] = mapped_column(String(64))
     difficulty: Mapped[int] = mapped_column(Integer, index=True)  # 1 (intro) à 5 (boss)
     time_limit_s: Mapped[float] = mapped_column(default=2.0)
     memory_limit_kb: Mapped[int] = mapped_column(default=262_144)
@@ -70,6 +70,10 @@ class Problem(Base):
     imported_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+    # Présence d'un éditorial sans matérialiser son texte (potentiellement long) :
+    # peuplé à la demande via with_expression(Problem.has_editorial, …).
+    has_editorial: Mapped[bool] = query_expression()
 
     tags: Mapped[list["ProblemTag"]] = relationship(
         back_populates="problem", cascade="all, delete-orphan"
@@ -158,9 +162,7 @@ class SkillPrerequisite(Base):
     skill_id: Mapped[int] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
     prerequisite_id: Mapped[int] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
 
-    skill: Mapped[Skill] = relationship(
-        back_populates="prerequisites", foreign_keys=[skill_id]
-    )
+    skill: Mapped[Skill] = relationship(back_populates="prerequisites", foreign_keys=[skill_id])
     prerequisite: Mapped[Skill] = relationship(foreign_keys=[prerequisite_id])
 
 
@@ -232,9 +234,7 @@ class ArticleProblem(Base):
     __table_args__ = (UniqueConstraint("article_id", "problem_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    article_id: Mapped[int] = mapped_column(
-        ForeignKey("course_articles.id", ondelete="CASCADE")
-    )
+    article_id: Mapped[int] = mapped_column(ForeignKey("course_articles.id", ondelete="CASCADE"))
     problem_id: Mapped[int] = mapped_column(
         ForeignKey("problems.id", ondelete="CASCADE"), index=True
     )
@@ -269,9 +269,7 @@ class SkillArticle(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     skill_id: Mapped[int] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"))
-    article_id: Mapped[int] = mapped_column(
-        ForeignKey("course_articles.id", ondelete="CASCADE")
-    )
+    article_id: Mapped[int] = mapped_column(ForeignKey("course_articles.id", ondelete="CASCADE"))
     position: Mapped[int] = mapped_column(Integer)
 
     skill: Mapped["Skill"] = relationship(back_populates="articles")
@@ -338,7 +336,10 @@ class ContestRegistration(Base):
 
 class Submission(Base):
     __tablename__ = "submissions"
-    __table_args__ = (Index("ix_submissions_user_problem", "user_id", "problem_id"),)
+    __table_args__ = (
+        Index("ix_submissions_user_problem", "user_id", "problem_id"),
+        Index("ix_submissions_problem_verdict", "problem_id", "verdict"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))

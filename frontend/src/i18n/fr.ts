@@ -58,7 +58,11 @@ export const fr = {
     count_one: 'problème',
     count_many: 'problèmes',
     empty: 'Aucun problème ne correspond à ces filtres.',
+    empty_catalogue: 'Aucun problème pour l’instant — ils arriveront bientôt ici.',
+    load_error: 'Impossible de charger les problèmes.',
+    retry: 'Réessayer',
     loading: 'chargement…',
+    load_more: 'Charger plus',
   },
   skills: {
     title: 'Problèmes',
@@ -70,17 +74,13 @@ export const fr = {
       recommended: 'Recommandé',
       not_ready: 'À explorer',
     },
-    soft_unlock: "Rien n'est verrouillé — l'arbre recommande, vous choisissez.",
     progress_overline: 'Progression',
-    skills_mastered: (n: number, m: number) =>
-      `${n} / ${m} compétence${m > 1 ? 's' : ''} maîtrisée${m > 1 ? 's' : ''}`,
+    mastered_label: 'compétences maîtrisées',
     problems_solved: (n: number, m: number) =>
       `${n} / ${m} problème${m > 1 ? 's' : ''} résolu${m > 1 ? 's' : ''}`,
-    panel_hint: 'Cliquez sur un nœud pour voir ses problèmes.',
     mastery_progress: (n: number, m: number) =>
       `${n} résolu${n > 1 ? 's' : ''} sur ${m} pour maîtriser`,
     prerequisites: 'Prérequis',
-    node_problems: 'Problèmes du nœud',
     empty:
       "L'arbre de compétences n'est pas encore défini (content/skills.yaml). " +
       'La liste des problèmes reste disponible.',
@@ -91,8 +91,6 @@ export const fr = {
     recenter: 'Recentrer',
     close_panel: 'Fermer',
     explore_hint: 'Glissez pour explorer · molette pour zoomer',
-    search_placeholder: 'Rechercher une compétence…',
-    search_empty: 'Aucune compétence trouvée',
   },
   courses: {
     title: 'Cours',

@@ -15,9 +15,7 @@ def write_valid_problem(root: Path) -> Path:
     d = root / "somme-test"
     (d / "tests").mkdir(parents=True)
     (d / "solutions").mkdir()
-    (d / "problem.yaml").write_text(
-        "title: Somme\ncategory: bases\ndifficulty: 1\ntags: [io]\n"
-    )
+    (d / "problem.yaml").write_text("title: Somme\ncategory: bases\ndifficulty: 1\ntags: [io]\n")
     (d / "statement.fr.md").write_text("Énoncé.")
     (d / "tests" / "sample1.in").write_text("2 3\n")
     (d / "tests" / "sample1.out").write_text("5\n")
@@ -57,9 +55,7 @@ def test_load_valid_problem(tmp_path):
         (lambda d: (d / "hints.yaml").write_text("pas: une liste\n"), "hints.yaml"),
         (lambda d: (d / "solutions" / "solution.py").unlink(), "solution"),
         (
-            lambda d: (d / "problem.yaml").write_text(
-                "title: X\ncategory: y\ndifficulty: 12\n"
-            ),
+            lambda d: (d / "problem.yaml").write_text("title: X\ncategory: y\ndifficulty: 12\n"),
             "difficulty",
         ),
     ],

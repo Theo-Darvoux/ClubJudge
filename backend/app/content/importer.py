@@ -80,9 +80,7 @@ def upsert_problem(db: Session, loaded: LoadedProblem) -> Problem:
         )
         for i, t in enumerate(loaded.tests)
     ]
-    problem.hints = [
-        ProblemHint(position=i + 1, content_fr=h) for i, h in enumerate(loaded.hints)
-    ]
+    problem.hints = [ProblemHint(position=i + 1, content_fr=h) for i, h in enumerate(loaded.hints)]
     db.commit()
     return problem
 
@@ -100,12 +98,14 @@ def sync_courses(db: Session, loaded: list[LoadedCourse]) -> list[Course]:
     Les cours/articles disparus du dépôt sont supprimés (avec leurs marques)."""
     problems = {p.slug: p for p in db.scalars(select(Problem))}
     for course_def in loaded:
-        missing = sorted({
-            s
-            for a in course_def.articles
-            for s in [*a.tp_problems, *a.practice]
-            if s not in problems
-        })
+        missing = sorted(
+            {
+                s
+                for a in course_def.articles
+                for s in [*a.tp_problems, *a.practice]
+                if s not in problems
+            }
+        )
         if missing:
             raise ContentError(
                 Path(f"courses/{course_def.slug}"),

@@ -8,7 +8,6 @@ export interface User {
 export interface ProblemSummary {
   slug: string;
   title: string;
-  category: string;
   difficulty: number;
   tags: string[];
   solved: boolean;
@@ -69,6 +68,7 @@ export interface SkillProblemRef {
   title: string;
   difficulty: number;
   solved: boolean;
+  attempted: boolean;
 }
 
 export interface SkillNode {
@@ -283,14 +283,9 @@ export const api = {
     }),
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
 
-  problems: (params: { category?: string; difficulty?: number; q?: string }) => {
-    const search = new URLSearchParams();
-    if (params.category) search.set('category', params.category);
-    if (params.difficulty) search.set('difficulty', String(params.difficulty));
-    if (params.q) search.set('q', params.q);
-    const qs = search.toString();
-    return request<ProblemSummary[]>(`/api/problems${qs ? `?${qs}` : ''}`);
-  },
+  // La liste est filtrée côté client (voir ProblemsPage) : l'endpoint renvoie
+  // tout le catalogue, sans paramètres de requête.
+  problems: () => request<ProblemSummary[]>('/api/problems'),
   skillTree: () => request<SkillNode[]>('/api/skills/tree'),
   problem: (slug: string) => request<ProblemDetail>(`/api/problems/${slug}`),
 

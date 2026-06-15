@@ -40,9 +40,7 @@ class FakeJudge(Judge):
         memory_limit_kb: int = 262_144,
     ) -> JudgeResult:
         self.calls.append(source_code)
-        per_test = [
-            TestVerdict(verdict=self.verdict, time_s=0.01, memory_kb=1024) for _ in tests
-        ]
+        per_test = [TestVerdict(verdict=self.verdict, time_s=0.01, memory_kb=1024) for _ in tests]
         return JudgeResult(verdict=self.verdict, tests=per_test)
 
     async def run(

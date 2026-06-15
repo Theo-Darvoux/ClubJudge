@@ -129,9 +129,7 @@ def login(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(
-    request: Request, response: Response, db: Annotated[Session, Depends(get_db)]
-) -> None:
+def logout(request: Request, response: Response, db: Annotated[Session, Depends(get_db)]) -> None:
     token = request.cookies.get(SESSION_COOKIE)
     if token:
         session = db.get(UserSession, _token_hash(token))

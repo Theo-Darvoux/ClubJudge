@@ -50,19 +50,19 @@ function Confetti() {
   );
 }
 
-/** Choisit jusqu'à trois problèmes « à faire ensuite » : non résolus, même
-    catégorie de préférence, de difficulté proche et croissante. */
+/** Choisit jusqu'à trois problèmes « à faire ensuite » : non résolus, de
+    difficulté proche et croissante, en privilégiant les tags partagés (les deux
+    signaux visibles par l'utilisateur). */
 function pickNext(
   all: ProblemSummary[],
   current: ProblemDetail,
 ): ProblemSummary[] {
   const candidates = all.filter((p) => p.slug !== current.slug && !p.solved);
   const score = (p: ProblemSummary) => {
-    const sameCat = p.category === current.category ? 0 : 100;
     const harder = p.difficulty >= current.difficulty ? 0 : 50;
     const dist = Math.abs(p.difficulty - current.difficulty);
     const sharedTags = p.tags.filter((tg) => current.tags.includes(tg)).length;
-    return sameCat + harder + dist * 10 - sharedTags * 5;
+    return harder + dist * 10 - sharedTags * 5;
   };
   return [...candidates].sort((a, b) => score(a) - score(b)).slice(0, 3);
 }
@@ -82,7 +82,7 @@ export function SolveCelebration({
 
   useEffect(() => {
     if (!ctx) {
-      api.problems({}).then(setFetchedProblems).catch(() => {});
+      api.problems().then(setFetchedProblems).catch(() => {});
     }
   }, [ctx]);
 

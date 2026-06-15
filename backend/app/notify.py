@@ -121,9 +121,7 @@ class ContestAnnouncer:
         now = utcnow()
         with self._session_factory() as db:
             started = db.scalars(
-                select(Contest).where(
-                    Contest.start_announced.is_(False), Contest.start_at <= now
-                )
+                select(Contest).where(Contest.start_announced.is_(False), Contest.start_at <= now)
             ).all()
             for contest in started:
                 contest.start_announced = True
@@ -132,9 +130,7 @@ class ContestAnnouncer:
                     await contest_started(contest.title, contest.end_at, len(contest.problems))
 
             finished = db.scalars(
-                select(Contest).where(
-                    Contest.results_announced.is_(False), Contest.end_at <= now
-                )
+                select(Contest).where(Contest.results_announced.is_(False), Contest.end_at <= now)
             ).all()
             for contest in finished:
                 contest.results_announced = True

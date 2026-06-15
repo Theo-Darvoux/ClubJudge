@@ -207,6 +207,16 @@ def test_contest_problem_public_after_end(client, db, problem):
     assert detail["contest"] is None
 
 
+def test_contest_problem_with_multiple_future_contests(client, db, problem):
+    register(client, "alice@example.org")
+    contest1 = make_contest(db, problem, start_in_min=-30, end_in_min=30, slug="contest-running")
+    register_to(db, contest1, "alice@example.org")
+    make_contest(db, problem, start_in_min=60, end_in_min=120, slug="contest-upcoming")
+
+    detail = client.get(f"/api/problems/{problem.slug}").json()
+    assert detail["contest"]["slug"] == "contest-running"
+
+
 def test_solutions_locked_during_contest(client, db, problem):
     register(client)
     contest = make_contest(db, problem, start_in_min=-30, end_in_min=30)

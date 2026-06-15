@@ -65,8 +65,11 @@ def _require(condition: bool, path: Path, message: str) -> None:
 
 def load_problem(problem_dir: Path) -> LoadedProblem:
     slug = problem_dir.name
-    _require(SLUG_RE.match(slug) is not None, problem_dir,
-             "le nom du dossier doit être un slug (minuscules, chiffres, tirets)")
+    _require(
+        SLUG_RE.match(slug) is not None,
+        problem_dir,
+        "le nom du dossier doit être un slug (minuscules, chiffres, tirets)",
+    )
 
     meta_path = problem_dir / "problem.yaml"
     _require(meta_path.is_file(), meta_path, "fichier problem.yaml manquant")
@@ -76,11 +79,17 @@ def load_problem(problem_dir: Path) -> LoadedProblem:
     for key in ("title", "category", "difficulty"):
         _require(key in meta, meta_path, f"champ obligatoire manquant : {key}")
     difficulty = meta["difficulty"]
-    _require(isinstance(difficulty, int) and 1 <= difficulty <= 5, meta_path,
-             "difficulty doit être un entier entre 1 et 5")
+    _require(
+        isinstance(difficulty, int) and 1 <= difficulty <= 5,
+        meta_path,
+        "difficulty doit être un entier entre 1 et 5",
+    )
     tags = meta.get("tags", [])
-    _require(isinstance(tags, list) and all(isinstance(t, str) for t in tags), meta_path,
-             "tags doit être une liste de chaînes")
+    _require(
+        isinstance(tags, list) and all(isinstance(t, str) for t in tags),
+        meta_path,
+        "tags doit être une liste de chaînes",
+    )
 
     statement_path = problem_dir / "statement.fr.md"
     _require(statement_path.is_file(), statement_path, "énoncé statement.fr.md manquant")
@@ -97,12 +106,15 @@ def load_problem(problem_dir: Path) -> LoadedProblem:
         out_path = in_path.with_suffix(".out")
         _require(out_path.is_file(), out_path, f"sortie attendue manquante pour {in_path.name}")
         tests.append(TestCase(input=in_path.read_text(), expected_output=out_path.read_text()))
-    _require(len(sample_paths) >= 1, tests_dir,
-             "au moins un test exemple requis (sample1.in/sample1.out, "
-             "reprenant l'exemple de l'énoncé)")
+    _require(
+        len(sample_paths) >= 1,
+        tests_dir,
+        "au moins un test exemple requis (sample1.in/sample1.out, reprenant l'exemple de l'énoncé)",
+    )
     _require(len(tests) >= 2, tests_dir, "au moins 2 tests requis (un exemple ne suffit pas)")
-    orphans = [p.name for p in sorted(tests_dir.glob("*.out"))
-               if not p.with_suffix(".in").is_file()]
+    orphans = [
+        p.name for p in sorted(tests_dir.glob("*.out")) if not p.with_suffix(".in").is_file()
+    ]
     _require(not orphans, tests_dir, f"fichiers .out sans .in correspondant : {orphans}")
 
     hints_path = problem_dir / "hints.yaml"
@@ -130,13 +142,15 @@ def load_problem(problem_dir: Path) -> LoadedProblem:
     solutions_dir = problem_dir / "solutions"
     _require(solutions_dir.is_dir(), solutions_dir, "dossier solutions/ manquant")
     solutions = [
-        ReferenceSolution(path=p, language=SOLUTION_EXTENSIONS[p.suffix],
-                          source_code=p.read_text())
+        ReferenceSolution(path=p, language=SOLUTION_EXTENSIONS[p.suffix], source_code=p.read_text())
         for p in sorted(solutions_dir.iterdir())
         if p.suffix in SOLUTION_EXTENSIONS
     ]
-    _require(len(solutions) >= 1, solutions_dir,
-             "au moins une solution de référence requise (.c, .cpp, .py ou .java)")
+    _require(
+        len(solutions) >= 1,
+        solutions_dir,
+        "au moins une solution de référence requise (.c, .cpp, .py ou .java)",
+    )
 
     return LoadedProblem(
         slug=slug,
@@ -211,20 +225,26 @@ def _parse_article_md(path: Path) -> tuple[dict, str, str]:
         parsed = yaml.safe_load(fm.group(1))
         _require(isinstance(parsed, dict), path, "le frontmatter doit être un mapping YAML")
         meta = parsed
-        raw = raw[fm.end():]
+        raw = raw[fm.end() :]
     title_match = TITLE_RE.match(raw)
-    _require(title_match is not None, path,
-             "l'article doit commencer par un titre de niveau 1 (`# Titre`)")
+    _require(
+        title_match is not None,
+        path,
+        "l'article doit commencer par un titre de niveau 1 (`# Titre`)",
+    )
     assert title_match is not None
-    body = raw[title_match.end():].strip()
+    body = raw[title_match.end() :].strip()
     _require(body != "", path, "l'article est vide après son titre")
     return meta, title_match.group(1), body
 
 
 def load_course(course_dir: Path, problem_slugs: set[str]) -> LoadedCourse:
     slug = course_dir.name
-    _require(SLUG_RE.match(slug) is not None, course_dir,
-             "le nom du dossier doit être un slug (minuscules, chiffres, tirets)")
+    _require(
+        SLUG_RE.match(slug) is not None,
+        course_dir,
+        "le nom du dossier doit être un slug (minuscules, chiffres, tirets)",
+    )
 
     meta_path = course_dir / "course.yaml"
     _require(meta_path.is_file(), meta_path, "fichier course.yaml manquant")
@@ -233,55 +253,81 @@ def load_course(course_dir: Path, problem_slugs: set[str]) -> LoadedCourse:
     for key in ("title", "category"):
         _require(
             isinstance(meta.get(key), str) and meta[key].strip() != "",
-            meta_path, f"champ obligatoire manquant : {key}",
+            meta_path,
+            f"champ obligatoire manquant : {key}",
         )
     position = meta.get("position", 0)
-    _require(isinstance(position, int), meta_path,
-             "position doit être un entier (ordre dans la catégorie)")
+    _require(
+        isinstance(position, int),
+        meta_path,
+        "position doit être un entier (ordre dans la catégorie)",
+    )
     description = meta.get("description")
-    _require(description is None or (isinstance(description, str) and description.strip() != ""),
-             meta_path, "description doit être une chaîne non vide si présente")
+    _require(
+        description is None or (isinstance(description, str) and description.strip() != ""),
+        meta_path,
+        "description doit être une chaîne non vide si présente",
+    )
 
     article_paths = sorted(course_dir.glob("*.fr.md"))
-    _require(len(article_paths) >= 1, course_dir,
-             "au moins un article requis (NN-slug.fr.md, ex. 01-introduction.fr.md)")
+    _require(
+        len(article_paths) >= 1,
+        course_dir,
+        "au moins un article requis (NN-slug.fr.md, ex. 01-introduction.fr.md)",
+    )
 
     articles: list[LoadedArticle] = []
     seen_slugs: set[str] = set()
     seen_positions: set[int] = set()
     for path in article_paths:
         match = ARTICLE_FILE_RE.match(path.name)
-        _require(match is not None, path,
-                 "nom d'article invalide : attendu NN-slug.fr.md (le préfixe "
-                 "numérique fixe l'ordre dans le cours)")
+        _require(
+            match is not None,
+            path,
+            "nom d'article invalide : attendu NN-slug.fr.md (le préfixe "
+            "numérique fixe l'ordre dans le cours)",
+        )
         assert match is not None
         article_pos, article_slug = int(match.group(1)), match.group(2)
         _require(article_slug not in seen_slugs, path, "slug d'article en double")
-        _require(article_pos not in seen_positions, path,
-                 f"préfixe {match.group(1)} déjà utilisé par un autre article")
+        _require(
+            article_pos not in seen_positions,
+            path,
+            f"préfixe {match.group(1)} déjà utilisé par un autre article",
+        )
         seen_slugs.add(article_slug)
         seen_positions.add(article_pos)
 
         fm, title_fr, body_fr = _parse_article_md(path)
 
         practice = fm.get("practice", [])
-        _require(isinstance(practice, list) and all(isinstance(p, str) for p in practice),
-                 path, "frontmatter : `practice` doit être une liste de slugs de problèmes")
-        _require(len(set(practice)) == len(practice), path,
-                 "frontmatter : slugs en double dans `practice`")
+        _require(
+            isinstance(practice, list) and all(isinstance(p, str) for p in practice),
+            path,
+            "frontmatter : `practice` doit être une liste de slugs de problèmes",
+        )
+        _require(
+            len(set(practice)) == len(practice),
+            path,
+            "frontmatter : slugs en double dans `practice`",
+        )
         unknown = [p for p in practice if p not in problem_slugs]
         _require(not unknown, path, f"`practice` : problème(s) inconnu(s) : {unknown}")
         for key in fm:
             _require(key == "practice", path, f"clé de frontmatter inconnue : {key}")
 
         tp_problems = extract_tp_slugs(body_fr)
-        _require(len(set(tp_problems)) == len(tp_problems), path,
-                 "un même problème apparaît dans plusieurs blocs TP")
+        _require(
+            len(set(tp_problems)) == len(tp_problems),
+            path,
+            "un même problème apparaît dans plusieurs blocs TP",
+        )
         unknown = [p for p in tp_problems if p not in problem_slugs]
         _require(not unknown, path, f"bloc(s) TP : problème(s) inconnu(s) : {unknown}")
         overlap = sorted(set(tp_problems) & set(practice))
-        _require(not overlap, path,
-                 f"problème(s) à la fois en bloc TP et dans `practice` : {overlap}")
+        _require(
+            not overlap, path, f"problème(s) à la fois en bloc TP et dans `practice` : {overlap}"
+        )
 
         en_path = path.with_name(path.name.replace(".fr.md", ".en.md"))
         title_en: str | None = None
@@ -291,24 +337,29 @@ def load_course(course_dir: Path, problem_slugs: set[str]) -> LoadedCourse:
             unknown = [p for p in extract_tp_slugs(body_en) if p not in problem_slugs]
             _require(not unknown, en_path, f"bloc(s) TP : problème(s) inconnu(s) : {unknown}")
 
-        articles.append(LoadedArticle(
-            slug=article_slug,
-            position=article_pos,
-            title_fr=title_fr,
-            title_en=title_en,
-            body_fr=body_fr,
-            body_en=body_en,
-            tp_problems=tp_problems,
-            practice=practice,
-        ))
+        articles.append(
+            LoadedArticle(
+                slug=article_slug,
+                position=article_pos,
+                title_fr=title_fr,
+                title_en=title_en,
+                body_fr=body_fr,
+                body_en=body_en,
+                tp_problems=tp_problems,
+                practice=practice,
+            )
+        )
 
     orphan_en = [
-        p.name for p in sorted(course_dir.glob("*.en.md"))
+        p.name
+        for p in sorted(course_dir.glob("*.en.md"))
         if not p.with_name(p.name.replace(".en.md", ".fr.md")).is_file()
     ]
-    _require(not orphan_en, course_dir,
-             f"article(s) .en.md sans .fr.md (le français est la langue de référence) : "
-             f"{orphan_en}")
+    _require(
+        not orphan_en,
+        course_dir,
+        f"article(s) .en.md sans .fr.md (le français est la langue de référence) : {orphan_en}",
+    )
 
     return LoadedCourse(
         slug=slug,
@@ -388,62 +439,89 @@ def load_skills(
         return []
 
     raw = yaml.safe_load(path.read_text())
-    _require(isinstance(raw, dict) and isinstance(raw.get("skills"), list), path,
-             "skills.yaml doit être un mapping YAML avec une clé `skills` (liste de nœuds)")
+    _require(
+        isinstance(raw, dict) and isinstance(raw.get("skills"), list),
+        path,
+        "skills.yaml doit être un mapping YAML avec une clé `skills` (liste de nœuds)",
+    )
 
     skills: dict[str, LoadedSkill] = {}
     for i, node in enumerate(raw["skills"]):
         where = f"nœud #{i + 1}"
         _require(isinstance(node, dict), path, f"{where} : chaque nœud doit être un mapping")
         skill_id = node.get("id")
-        _require(isinstance(skill_id, str) and SLUG_RE.match(skill_id) is not None, path,
-                 f"{where} : `id` doit être un slug (minuscules, chiffres, tirets)")
+        _require(
+            isinstance(skill_id, str) and SLUG_RE.match(skill_id) is not None,
+            path,
+            f"{where} : `id` doit être un slug (minuscules, chiffres, tirets)",
+        )
         where = f"nœud `{skill_id}`"
         _require(skill_id not in skills, path, f"{where} : id en double")
 
         name = node.get("name")
-        _require(isinstance(name, str) and name.strip() != "", path,
-                 f"{where} : `name` (nom affiché, en français) est obligatoire")
+        _require(
+            isinstance(name, str) and name.strip() != "",
+            path,
+            f"{where} : `name` (nom affiché, en français) est obligatoire",
+        )
 
         position = node.get("position")
         _require(
-            isinstance(position, list) and len(position) == 2
+            isinstance(position, list)
+            and len(position) == 2
             and all(isinstance(c, int | float) for c in position),
-            path, f"{where} : `position` doit être une paire [x, y] (fixée à la main)",
+            path,
+            f"{where} : `position` doit être une paire [x, y] (fixée à la main)",
         )
 
         problems = node.get("problems")
         _require(
-            isinstance(problems, list) and len(problems) >= 1
+            isinstance(problems, list)
+            and len(problems) >= 1
             and all(isinstance(p, str) for p in problems),
-            path, f"{where} : `problems` doit lister au moins un slug de problème",
+            path,
+            f"{where} : `problems` doit lister au moins un slug de problème",
         )
-        _require(len(set(problems)) == len(problems), path,
-                 f"{where} : slugs de problèmes en double")
+        _require(
+            len(set(problems)) == len(problems), path, f"{where} : slugs de problèmes en double"
+        )
         unknown = [p for p in problems if p not in problem_slugs]
         _require(not unknown, path, f"{where} : problème(s) inconnu(s) : {unknown}")
 
         requires = node.get("requires", [])
-        _require(isinstance(requires, list) and all(isinstance(r, str) for r in requires),
-                 path, f"{where} : `requires` doit être une liste d'ids de compétences")
+        _require(
+            isinstance(requires, list) and all(isinstance(r, str) for r in requires),
+            path,
+            f"{where} : `requires` doit être une liste d'ids de compétences",
+        )
         _require(skill_id not in requires, path, f"{where} : un nœud ne peut pas se requérir")
 
         mastery = node.get("mastery", default_mastery(len(problems)))
-        _require(isinstance(mastery, int) and 1 <= mastery <= len(problems), path,
-                 f"{where} : `mastery` doit être un entier entre 1 et {len(problems)} "
-                 "(nb de problèmes résolus pour maîtriser le nœud)")
+        _require(
+            isinstance(mastery, int) and 1 <= mastery <= len(problems),
+            path,
+            f"{where} : `mastery` doit être un entier entre 1 et {len(problems)} "
+            "(nb de problèmes résolus pour maîtriser le nœud)",
+        )
 
         for key in ("name_en", "description", "description_en"):
             value = node.get(key)
-            _require(value is None or (isinstance(value, str) and value.strip() != ""),
-                     path, f"{where} : `{key}` doit être une chaîne non vide si présent")
+            _require(
+                value is None or (isinstance(value, str) and value.strip() != ""),
+                path,
+                f"{where} : `{key}` doit être une chaîne non vide si présent",
+            )
 
         articles = node.get("articles", [])
-        _require(isinstance(articles, list) and all(isinstance(a, str) for a in articles),
-                 path, f"{where} : `articles` doit être une liste de références "
-                       "`slug-du-cours/slug-de-l-article`")
-        _require(len(set(articles)) == len(articles), path,
-                 f"{where} : références d'articles en double")
+        _require(
+            isinstance(articles, list) and all(isinstance(a, str) for a in articles),
+            path,
+            f"{where} : `articles` doit être une liste de références "
+            "`slug-du-cours/slug-de-l-article`",
+        )
+        _require(
+            len(set(articles)) == len(articles), path, f"{where} : références d'articles en double"
+        )
         unknown = [a for a in articles if a not in known_articles]
         _require(not unknown, path, f"{where} : article(s) inconnu(s) : {unknown}")
 
@@ -463,7 +541,6 @@ def load_skills(
 
     for skill in skills.values():
         unknown = [r for r in skill.requires if r not in skills]
-        _require(not unknown, path,
-                 f"nœud `{skill.id}` : prérequis inconnu(s) : {unknown}")
+        _require(not unknown, path, f"nœud `{skill.id}` : prérequis inconnu(s) : {unknown}")
     _check_acyclic(skills, path)
     return list(skills.values())

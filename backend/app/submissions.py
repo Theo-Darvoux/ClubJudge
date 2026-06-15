@@ -6,16 +6,17 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, defer, joinedload, load_only, selectinload
 
 from app.auth import get_current_user
 from app.config import get_settings
-from app.contests import hidden_problem_ids, running_contest_for
+from app.contests import require_contest_access
 from app.db import as_utc, get_db
 from app.judge.base import Judge
 from app.judge.types import Language, Verdict
 from app.judging import JudgeWorker
 from app.models import Contest, Problem, Submission, User
+from app.problems import get_problem_or_404
 
 router = APIRouter(prefix="/api", tags=["submissions"])
 
@@ -41,13 +42,8 @@ def _contest_access(db: Session, user: User, problem: Problem) -> Contest | None
     """404 si le problème appartient à un contest non terminé et que
     l'utilisateur n'y a pas accès ; sinon, le contest en cours qui donne accès
     (None pour un problème public)."""
-    now = datetime.now(UTC)
-    if problem.id not in hidden_problem_ids(db, now):
-        return None
-    contest = running_contest_for(db, user, problem.id, now)
-    if contest is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
-    return contest
+    res = require_contest_access(db, user, problem.id, datetime.now(UTC))
+    return res.contest if res else None
 
 
 class SubmissionPayload(BaseModel):
@@ -107,9 +103,8 @@ def submit(
     if len(payload.source_code.encode()) > MAX_SOURCE_BYTES:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "source_too_large")
 
-    problem = db.scalar(select(Problem).where(Problem.slug == slug))
-    if problem is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
+    # Seuls l'id (accès contest) et le slug (réponse) sont nécessaires ici.
+    problem = get_problem_or_404(db, slug, options=[load_only(Problem.slug)])
 
     # Problème de contest : accessible pendant la fenêtre aux seuls inscrits,
     # et la soumission est alors rattachée au contest (scoreboard).
@@ -202,11 +197,14 @@ async def run_code(
     ):
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "input_too_large")
 
-    problem = db.scalar(
-        select(Problem).options(selectinload(Problem.tests)).where(Problem.slug == slug)
+    problem = get_problem_or_404(
+        db,
+        slug,
+        options=[
+            selectinload(Problem.tests),
+            load_only(Problem.time_limit_s, Problem.memory_limit_kb),
+        ],
     )
-    if problem is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
     _contest_access(db, user, problem)
 
     now = time.monotonic()
@@ -270,7 +268,11 @@ def get_submission(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> SubmissionDetailOut:
-    submission = db.get(Submission, submission_id)
+    submission = db.scalar(
+        select(Submission)
+        .options(joinedload(Submission.problem))
+        .where(Submission.id == submission_id)
+    )
     if submission is None or submission.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "submission_not_found")
     return SubmissionDetailOut.from_model(submission)
@@ -282,12 +284,15 @@ def list_my_submissions(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> list[SubmissionOut]:
-    problem = db.scalar(select(Problem).where(Problem.slug == slug))
-    if problem is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
+    problem = get_problem_or_404(db, slug, options=[load_only(Problem.id)])
     _contest_access(db, user, problem)
     submissions = db.scalars(
         select(Submission)
+        .options(
+            joinedload(Submission.problem),
+            defer(Submission.source_code),
+            defer(Submission.compile_output),
+        )
         .where(Submission.user_id == user.id, Submission.problem_id == problem.id)
         .order_by(Submission.created_at.desc())
         .limit(50)

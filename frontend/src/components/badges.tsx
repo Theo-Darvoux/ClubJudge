@@ -1,14 +1,23 @@
 import type { Submission, Verdict } from '../api';
 import { useI18n } from '../i18n/context';
+import { LEVELS, problemStatus } from '../problems/status';
+
+export function DifficultyDotsInner({ level }: { level: number }) {
+  return (
+    <>
+      {LEVELS.map((i) => (
+        <span key={i} className={i <= level ? 'dot is-on' : 'dot'} />
+      ))}
+    </>
+  );
+}
 
 export function DifficultyDots({ level }: { level: number }) {
   const { t } = useI18n();
   return (
     <span className="difficulty" data-level={level} title={t.difficulty[level]}>
       <span className="difficulty-dots" aria-hidden="true">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <span key={i} className={i <= level ? 'dot is-on' : 'dot'} />
-        ))}
+        <DifficultyDotsInner level={level} />
       </span>
       <span className="difficulty-label">{t.difficulty[level]}</span>
     </span>
@@ -23,14 +32,15 @@ export function StatusMark({
   attempted: boolean;
 }) {
   const { t } = useI18n();
-  if (solved) {
+  const state = problemStatus({ solved, attempted });
+  if (state === 'solved') {
     return (
       <span className="status-mark is-solved" title={t.problems.solved}>
         ✓
       </span>
     );
   }
-  if (attempted) {
+  if (state === 'attempted') {
     return (
       <span className="status-mark is-attempted" title={t.problems.attempted}>
         ◌

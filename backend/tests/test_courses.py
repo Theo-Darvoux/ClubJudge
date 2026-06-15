@@ -286,8 +286,12 @@ def test_list_courses_with_progress(tmp_path, db, client):
     deux_sommes = db.query(Problem).filter_by(slug="deux-sommes").one()
     db.add(
         Submission(
-            user_id=user["id"], problem_id=deux_sommes.id, language="python",
-            source_code="print()", status="done", verdict="AC",
+            user_id=user["id"],
+            problem_id=deux_sommes.id,
+            language="python",
+            source_code="print()",
+            status="done",
+            verdict="AC",
         )
     )
     db.commit()
@@ -363,8 +367,10 @@ def test_contest_problem_hidden_from_practice_and_links(tmp_path, db, client):
     now = datetime.now(UTC)
     semaine = db.query(Problem).filter_by(slug="la-meilleure-semaine").one()
     contest = Contest(
-        slug="c1", title="C1",
-        start_at=now - timedelta(hours=1), end_at=now + timedelta(hours=1),
+        slug="c1",
+        title="C1",
+        start_at=now - timedelta(hours=1),
+        end_at=now + timedelta(hours=1),
         problems=[ContestProblem(problem_id=semaine.id, label="A")],
         registrations=[ContestRegistration(user_id=user["id"])],
     )

@@ -153,8 +153,15 @@ def test_sync_skills_requires_imported_problems(db):
     from app.content.loader import LoadedSkill
 
     orphan = LoadedSkill(
-        id="a", name_fr="A", name_en=None, description_fr=None, description_en=None,
-        x=0, y=0, problems=["jamais-importe"], mastery=1,
+        id="a",
+        name_fr="A",
+        name_en=None,
+        description_fr=None,
+        description_en=None,
+        x=0,
+        y=0,
+        problems=["jamais-importe"],
+        mastery=1,
     )
     with pytest.raises(ContentError, match="jamais-importe"):
         sync_skills(db, [orphan])
@@ -177,8 +184,12 @@ def test_tree_states_follow_progression(tmp_path, db, client):
     deux_sommes = db.query(Problem).filter_by(slug="deux-sommes").one()
     db.add(
         Submission(
-            user_id=user["id"], problem_id=deux_sommes.id, language="python",
-            source_code="print()", status="done", verdict="AC",
+            user_id=user["id"],
+            problem_id=deux_sommes.id,
+            language="python",
+            source_code="print()",
+            status="done",
+            verdict="AC",
         )
     )
     db.commit()

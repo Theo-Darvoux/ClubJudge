@@ -79,8 +79,7 @@ async def _run(command: str, content_dir: Path) -> int:
         if skills:
             if command == "import":
                 if failures:
-                    print("skills.yaml : import sauté (des erreurs précèdent)",
-                          file=sys.stderr)
+                    print("skills.yaml : import sauté (des erreurs précèdent)", file=sys.stderr)
                     return 1
                 with SessionLocal() as db:
                     sync_skills(db, skills)
@@ -96,7 +95,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="clubjudge-content")
     parser.add_argument("command", choices=["validate", "import"])
     parser.add_argument(
-        "content_dir", nargs="?", default=get_settings().content_dir,
+        "content_dir",
+        nargs="?",
+        default=get_settings().content_dir,
         help="dossier content/ (défaut : %(default)s)",
     )
     args = parser.parse_args()

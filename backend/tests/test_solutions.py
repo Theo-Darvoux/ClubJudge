@@ -4,8 +4,9 @@ from app.models import Submission
 from tests.conftest import register
 
 
-def _add_ac(db, user_id: int, problem_id: int, *, language="python", time_s=0.05,
-            source="print(5)") -> None:
+def _add_ac(
+    db, user_id: int, problem_id: int, *, language="python", time_s=0.05, source="print(5)"
+) -> None:
     db.add(
         Submission(
             user_id=user_id,

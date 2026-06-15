@@ -51,9 +51,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("course_id", "slug"),
         sa.UniqueConstraint("course_id", "position"),
     )
-    op.create_index(
-        op.f("ix_course_articles_slug"), "course_articles", ["slug"], unique=False
-    )
+    op.create_index(op.f("ix_course_articles_slug"), "course_articles", ["slug"], unique=False)
     op.create_table(
         "article_problems",
         sa.Column("id", sa.Integer(), nullable=False),

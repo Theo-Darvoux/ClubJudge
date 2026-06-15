@@ -104,7 +104,10 @@ class JudgeWorker:
                 attempt += 1
                 logger.warning(
                     "judge unreachable for submission %d (attempt %d, retry in %ds): %s",
-                    submission_id, attempt, delay, exc,
+                    submission_id,
+                    attempt,
+                    delay,
+                    exc,
                 )
                 await asyncio.sleep(delay)
 

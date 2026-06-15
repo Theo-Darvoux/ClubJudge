@@ -58,7 +58,7 @@ export function AdminPage() {
 
   const reload = useCallback(() => {
     api.contests().then(setContests).catch(() => {});
-    api.problems({}).then(setProblems).catch(() => {});
+    api.problems().then(setProblems).catch(() => {});
   }, []);
   useEffect(reload, [reload]);
 

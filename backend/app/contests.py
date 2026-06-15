@@ -19,8 +19,8 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import Select, func, select
+from sqlalchemy.orm import Session, defer, load_only, selectinload
 
 from app import notify
 from app.auth import AdminUser, get_current_user
@@ -35,6 +35,8 @@ from app.models import (
     SubmissionStatus,
     User,
 )
+from app.progress import solved_attempted_ids
+from app.schemas import ProblemRef
 
 router = APIRouter(prefix="/api/contests", tags=["contests"])
 
@@ -61,32 +63,72 @@ def contest_phase(contest: Contest, now: datetime) -> Phase:
     return "finished"
 
 
+def hidden_problem_ids_select(now: datetime) -> Select[tuple[int]]:
+    """Selectable des ids de problèmes rattachés à un contest pas encore
+    terminé — la règle de visibilité ICPC, en un seul endroit. Réutilisée comme
+    sous-requête (liste générale) ou matérialisée (`hidden_problem_ids`)."""
+    return (
+        select(ContestProblem.problem_id)
+        .join(Contest, ContestProblem.contest_id == Contest.id)
+        .where(Contest.end_at > now)
+    )
+
+
 def hidden_problem_ids(db: Session, now: datetime) -> set[int]:
     """Problèmes rattachés à un contest pas encore terminé : hors de la liste
     générale et inaccessibles, sauf via le contest pour ses inscrits."""
-    return set(
-        db.scalars(
-            select(ContestProblem.problem_id)
-            .join(Contest, ContestProblem.contest_id == Contest.id)
-            .where(Contest.end_at > now)
+    return set(db.scalars(hidden_problem_ids_select(now)))
+
+
+def is_problem_hidden(db: Session, problem_id: int, now: datetime) -> bool:
+    """Vérifie si un problème spécifique appartient à un contest non terminé."""
+    return (
+        db.scalar(
+            hidden_problem_ids_select(now).where(ContestProblem.problem_id == problem_id).limit(1)
         )
+        is not None
     )
 
 
-def running_contest_for(db: Session, user: User, problem_id: int, now: datetime) -> Contest | None:
-    """Contest en cours qui contient ce problème et où l'utilisateur est
-    inscrit — c'est lui qui donne accès au problème pendant la fenêtre."""
-    return db.scalar(
-        select(Contest)
+@dataclass(frozen=True)
+class ActiveContestInfo:
+    contest: Contest
+    label: str
+
+
+def require_contest_access(
+    db: Session, user: User, problem_id: int, now: datetime
+) -> ActiveContestInfo | None:
+    """Renvoie le contest en cours qui donne accès à ce problème (l'utilisateur
+    y est inscrit), ou None pour un problème public ou un admin. **Lève une 404**
+    si le problème est caché par un contest auquel l'utilisateur n'a pas accès.
+    """
+    stmt = (
+        select(
+            Contest,
+            ContestProblem.label,
+            ContestRegistration.id.is_not(None).label("is_registered"),
+        )
+        .options(load_only(Contest.slug, Contest.title, Contest.start_at, Contest.end_at))
         .join(ContestProblem, ContestProblem.contest_id == Contest.id)
-        .join(ContestRegistration, ContestRegistration.contest_id == Contest.id)
-        .where(
-            ContestProblem.problem_id == problem_id,
-            ContestRegistration.user_id == user.id,
-            Contest.start_at <= now,
-            Contest.end_at > now,
+        .outerjoin(
+            ContestRegistration,
+            (ContestRegistration.contest_id == Contest.id)
+            & (ContestRegistration.user_id == user.id),
         )
+        .where(ContestProblem.problem_id == problem_id, Contest.end_at > now)
     )
+    rows = db.execute(stmt).all()
+    if not rows:
+        return None
+
+    for contest, label, is_registered in rows:
+        if as_utc(contest.start_at) <= now and is_registered:
+            return ActiveContestInfo(contest=contest, label=label or "?")
+
+    if user.role == "admin":
+        return None
+    raise HTTPException(status.HTTP_404_NOT_FOUND, "problem_not_found")
 
 
 # ---------------------------------------------------------------------------
@@ -167,8 +209,11 @@ def compute_scores(
                 last = max(last, minute)
         rows.append(
             RowScore(
-                user_id=user_id, solved=solved, penalty_min=penalty,
-                last_solve_min=last, cells=cells,
+                user_id=user_id,
+                solved=solved,
+                penalty_min=penalty,
+                last_solve_min=last,
+                cells=cells,
             )
         )
     rows.sort(key=lambda r: (-r.solved, r.penalty_min, r.last_solve_min))
@@ -190,12 +235,8 @@ class ContestSummary(BaseModel):
     registered: bool
 
 
-class ContestProblemOut(BaseModel):
+class ContestProblemOut(ProblemRef):
     label: str
-    slug: str
-    title: str
-    difficulty: int
-    solved: bool
 
 
 class ContestDetail(ContestSummary):
@@ -304,13 +345,7 @@ def get_contest(
 
     problems: list[ContestProblemOut] | None = None
     if phase == "finished" or (phase == "running" and registered):
-        solved_ids = set(
-            db.scalars(
-                select(Submission.problem_id).where(
-                    Submission.user_id == user.id, Submission.verdict == Verdict.ACCEPTED
-                )
-            )
-        )
+        solved_ids, _ = solved_attempted_ids(db, user.id)
         problems = [
             ContestProblemOut(
                 label=cp.label,
@@ -390,7 +425,9 @@ def build_scoreboard(
     users = {r.user_id: r.user.display_name for r in registrations}
     problem_ids = [cp.problem_id for cp in contest.problems]
     submissions = db.scalars(
-        select(Submission).where(Submission.contest_id == contest.id)
+        select(Submission)
+        .options(defer(Submission.source_code), defer(Submission.compile_output))
+        .where(Submission.contest_id == contest.id)
     ).all()
 
     rows = compute_scores(contest.start_at, list(users), problem_ids, submissions)
@@ -421,9 +458,7 @@ def build_scoreboard(
                 ],
             )
         )
-    return ScoreboardOut(
-        phase=phase, problems=[cp.label for cp in contest.problems], rows=out
-    )
+    return ScoreboardOut(phase=phase, problems=[cp.label for cp in contest.problems], rows=out)
 
 
 @router.get("/{slug}/scoreboard")
@@ -474,10 +509,7 @@ def _validate_payload(db: Session, payload: ContestPayload) -> list[tuple[int, s
         if not LABEL_RE.fullmatch(label):
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "bad_label")
 
-    by_slug = {
-        p.slug: p.id
-        for p in db.scalars(select(Problem).where(Problem.slug.in_(slugs)))
-    }
+    by_slug = {p.slug: p.id for p in db.scalars(select(Problem).where(Problem.slug.in_(slugs)))}
     missing = [s for s in slugs if s not in by_slug]
     if missing:
         raise HTTPException(
@@ -503,9 +535,7 @@ def create_contest(
         description=payload.description,
         start_at=payload.start_at,
         end_at=payload.end_at,
-        problems=[
-            ContestProblem(problem_id=pid, label=label) for pid, label in attached
-        ],
+        problems=[ContestProblem(problem_id=pid, label=label) for pid, label in attached],
     )
     db.add(contest)
     db.commit()

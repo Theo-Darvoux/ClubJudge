@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-06-12
 
 """
+
 from collections.abc import Sequence
 
 revision: str = "0001"

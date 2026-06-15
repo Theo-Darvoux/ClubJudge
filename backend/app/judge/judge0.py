@@ -190,6 +190,7 @@ class Judge0Judge(Judge):
                 )
             )
 
-        overall = next((t.verdict for t in tests if t.verdict is not Verdict.ACCEPTED),
-                       Verdict.ACCEPTED)
+        overall = next(
+            (t.verdict for t in tests if t.verdict is not Verdict.ACCEPTED), Verdict.ACCEPTED
+        )
         return JudgeResult(verdict=overall, tests=tests, compile_output=compile_output)

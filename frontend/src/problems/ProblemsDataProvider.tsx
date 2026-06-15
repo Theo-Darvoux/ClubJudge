@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { api } from '../api';
 import type { ProblemSummary, SkillNode } from '../api';
@@ -17,24 +17,73 @@ import { ProblemsDataContext } from './context';
 export function ProblemsDataProvider() {
   const [problems, setProblems] = useState<ProblemSummary[] | null>(null);
   const [skillTree, setSkillTree] = useState<SkillNode[] | null>(null);
+  // Échec du chargement des problèmes (réseau / serveur) — distinct d'un
+  // catalogue vide, pour que la vue liste propose un vrai « réessayer ».
+  const [error, setError] = useState(false);
+  // Échec du chargement de l'arbre de compétences
+  const [treeError, setTreeError] = useState(false);
+  // Incrémenté par reload() pour relancer l'effet de chargement.
+  const [attempt, setAttempt] = useState(0);
+
+  const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
   useEffect(() => {
     let cancelled = false;
+    // On réinitialise à null et sans erreur pour afficher l'état de chargement lors d'un retry.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset to loading state before async fetch
+    setProblems(null);
+    setSkillTree(null);
+    setError(false);
+    setTreeError(false);
+
     api
-      .problems({})
-      .then((p) => !cancelled && setProblems(p))
-      .catch(() => !cancelled && setProblems([]));
+      .problems()
+      .then((p) => {
+        if (!cancelled) {
+          setProblems(p);
+          setError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProblems([]);
+          setError(true);
+        }
+      });
+    // L'arbre échoue indépendamment : un revers ici n'empêche pas la liste de
+    // s'afficher (et inversement).
     api
       .skillTree()
-      .then((t) => !cancelled && setSkillTree(t))
-      .catch(() => !cancelled && setSkillTree([]));
+      .then((t) => {
+        if (!cancelled) {
+          setSkillTree(t);
+          setTreeError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSkillTree([]);
+          setTreeError(true);
+        }
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
+
+  // Compteurs de progression dérivés une seule fois ici (pas dans chaque vue) :
+  // l'arbre et la liste lisent les mêmes résolus/total.
+  const { solvedProblems, totalProblems } = useMemo(() => {
+    const list = problems ?? [];
+    let solved = 0;
+    for (const p of list) if (p.solved) solved += 1;
+    return { solvedProblems: solved, totalProblems: list.length };
+  }, [problems]);
 
   return (
-    <ProblemsDataContext.Provider value={{ problems, skillTree }}>
+    <ProblemsDataContext.Provider
+      value={{ problems, skillTree, error, treeError, reload, solvedProblems, totalProblems }}
+    >
       <Outlet />
     </ProblemsDataContext.Provider>
   );

@@ -27,7 +27,10 @@ def upgrade() -> None:
         sa.Column("start_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("end_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column("start_announced", sa.Boolean(), nullable=False),
         sa.Column("results_announced", sa.Boolean(), nullable=False),
@@ -63,9 +66,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("contest_id", "user_id"),
     )
     op.add_column("submissions", sa.Column("contest_id", sa.Integer(), nullable=True))
-    op.create_index(
-        op.f("ix_submissions_contest_id"), "submissions", ["contest_id"], unique=False
-    )
+    op.create_index(op.f("ix_submissions_contest_id"), "submissions", ["contest_id"], unique=False)
     op.create_foreign_key(
         "fk_submissions_contest_id",
         "submissions",

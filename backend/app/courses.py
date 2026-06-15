@@ -13,21 +13,22 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, defer, load_only, selectinload
 
 from app.auth import get_current_user
 from app.contests import hidden_problem_ids
 from app.db import get_db
-from app.judge.types import Verdict
 from app.models import (
     ArticleProblem,
     ArticleProblemKind,
     ArticleRead,
     Course,
     CourseArticle,
-    Submission,
+    Problem,
     User,
 )
+from app.progress import solved_attempted_ids
+from app.schemas import ProblemRef
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
 
@@ -56,11 +57,8 @@ class CourseDetail(CourseSummary):
     articles: list[ArticleSummary]
 
 
-class ArticleProblemRef(BaseModel):
-    slug: str
-    title: str
-    difficulty: int
-    solved: bool
+# Référence à un problème « pour pratiquer » : même forme que partout ailleurs.
+ArticleProblemRef = ProblemRef
 
 
 class ArticleNeighbor(BaseModel):
@@ -83,21 +81,8 @@ class ArticleDetail(BaseModel):
     next: ArticleNeighbor | None
 
 
-def _solved_ids(db: Session, user: User) -> set[int]:
-    return {
-        pid
-        for (pid,) in db.execute(
-            select(Submission.problem_id).distinct().where(
-                Submission.user_id == user.id, Submission.verdict == Verdict.ACCEPTED
-            )
-        )
-    }
-
-
 def _read_ids(db: Session, user: User) -> set[int]:
-    return set(
-        db.scalars(select(ArticleRead.article_id).where(ArticleRead.user_id == user.id))
-    )
+    return set(db.scalars(select(ArticleRead.article_id).where(ArticleRead.user_id == user.id)))
 
 
 def _tp_ids(article: CourseArticle) -> list[int]:
@@ -111,25 +96,31 @@ def list_courses(
 ) -> list[CourseSummary]:
     courses = db.scalars(
         select(Course)
-        .options(selectinload(Course.articles).selectinload(CourseArticle.problems))
+        .options(
+            selectinload(Course.articles)
+            .options(defer(CourseArticle.body_fr), defer(CourseArticle.body_en))
+            .selectinload(CourseArticle.problems)
+        )
         .order_by(Course.category, Course.position, Course.title)
     ).all()
-    solved = _solved_ids(db, user)
+    solved, _ = solved_attempted_ids(db, user.id)
     read = _read_ids(db, user)
 
     out = []
     for course in courses:
         tps = [pid for a in course.articles for pid in _tp_ids(a)]
-        out.append(CourseSummary(
-            slug=course.slug,
-            title=course.title,
-            category=course.category,
-            description=course.description,
-            article_count=len(course.articles),
-            read_count=sum(1 for a in course.articles if a.id in read),
-            tp_total=len(tps),
-            tp_solved=sum(1 for pid in tps if pid in solved),
-        ))
+        out.append(
+            CourseSummary(
+                slug=course.slug,
+                title=course.title,
+                category=course.category,
+                description=course.description,
+                article_count=len(course.articles),
+                read_count=sum(1 for a in course.articles if a.id in read),
+                tp_total=len(tps),
+                tp_solved=sum(1 for pid in tps if pid in solved),
+            )
+        )
     return out
 
 
@@ -138,8 +129,10 @@ def _get_course_or_404(db: Session, slug: str) -> Course:
         select(Course)
         .options(
             selectinload(Course.articles)
+            .options(defer(CourseArticle.body_fr), defer(CourseArticle.body_en))
             .selectinload(CourseArticle.problems)
             .selectinload(ArticleProblem.problem)
+            .options(load_only(Problem.slug, Problem.title, Problem.difficulty))
         )
         .where(Course.slug == slug)
     )
@@ -155,7 +148,7 @@ def get_course(
     user: Annotated[User, Depends(get_current_user)],
 ) -> CourseDetail:
     course = _get_course_or_404(db, slug)
-    solved = _solved_ids(db, user)
+    solved, _ = solved_attempted_ids(db, user.id)
     read = _read_ids(db, user)
 
     articles = [
@@ -198,7 +191,7 @@ def get_article(
 ) -> ArticleDetail:
     course = _get_course_or_404(db, slug)
     article = _get_article_or_404(course, article_slug)
-    solved = _solved_ids(db, user)
+    solved, _ = solved_attempted_ids(db, user.id)
     # Un problème rattaché à un contest non terminé reste secret partout, y
     # compris dans la liste « pour pratiquer ». (Un bloc TP sur un tel problème
     # tombera sur le 404 de la page problème — à éviter côté éditorial.)
@@ -218,7 +211,8 @@ def get_article(
             select(ArticleRead.id).where(
                 ArticleRead.user_id == user.id, ArticleRead.article_id == article.id
             )
-        ) is not None,
+        )
+        is not None,
         course_slug=course.slug,
         course_title=course.title,
         practice=[
@@ -232,9 +226,11 @@ def get_article(
             if ap.kind == ArticleProblemKind.PRACTICE and ap.problem_id not in hidden
         ],
         prev=ArticleNeighbor(slug=prev.slug, title_fr=prev.title_fr, title_en=prev.title_en)
-        if prev else None,
+        if prev
+        else None,
         next=ArticleNeighbor(slug=next_.slug, title_fr=next_.title_fr, title_en=next_.title_en)
-        if next_ else None,
+        if next_
+        else None,
     )
 
 
