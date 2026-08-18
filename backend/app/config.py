@@ -17,6 +17,22 @@ class Settings(BaseSettings):
     # Webhook Discord du club pour les annonces (vide = annonces désactivées).
     discord_webhook_url: str = ""
 
+    # Défense en profondeur HTTP / WebSocket. Le cooldown métier des soumissions
+    # reste inchangé ; ces limites empêchent surtout la multiplication de comptes
+    # ou de connexions depuis une même adresse.
+    login_rate_limit_per_minute: int = 20
+    register_rate_limit_per_hour: int = 30
+    submit_ip_rate_limit_per_minute: int = 30
+    run_ip_rate_limit_per_minute: int = 60
+    lsp_connect_rate_limit_per_minute: int = 20
+    lsp_max_sessions_per_user: int = 2
+    lsp_max_sessions_global: int = 32
+    lsp_session_ttl_s: int = 3600
+
+    # Plusieurs consommateurs évitent qu'une panne Judge0 sur une soumission
+    # bloque toute la file. Les retries sont replanifiés, pas attendus par un worker.
+    judge_worker_concurrency: int = 2
+
 
 @lru_cache
 def get_settings() -> Settings:

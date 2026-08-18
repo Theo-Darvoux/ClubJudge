@@ -248,6 +248,8 @@ export interface Submission {
   source_code?: string;
 }
 
+export const AUTH_EXPIRED_EVENT = 'clubjudge:auth-expired';
+
 export class ApiError extends Error {
   status: number;
   detail: unknown;
@@ -273,6 +275,9 @@ async function rawFetch(path: string, init?: RequestInit): Promise<Response> {
     ...init,
   });
   if (!resp.ok) {
+    if (resp.status === 401) {
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+    }
     let detail: unknown = null;
     try {
       detail = (await resp.json()).detail;

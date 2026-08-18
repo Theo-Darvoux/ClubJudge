@@ -17,6 +17,7 @@ from app.judge.types import Language, Verdict
 from app.judging import JudgeWorker
 from app.models import Contest, Problem, Submission, User
 from app.problems import get_problem_or_404
+from app.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api", tags=["submissions"])
 
@@ -126,11 +127,19 @@ class SubmissionDetailOut(SubmissionOut):
 def submit(
     slug: str,
     payload: SubmissionPayload,
+    request: Request,
     response: Response,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
     worker: Annotated[JudgeWorker, Depends(get_worker)],
 ) -> SubmissionOut:
+    settings = get_settings()
+    enforce_rate_limit(
+        request,
+        "submission.create",
+        limit=settings.submit_ip_rate_limit_per_minute,
+        window_s=60,
+    )
     if len(payload.source_code.encode()) > MAX_SOURCE_BYTES:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "source_too_large")
 
@@ -237,6 +246,7 @@ def _truncate(text: str | None) -> tuple[str | None, bool]:
 async def run_code(
     slug: str,
     payload: RunPayload,
+    request: Request,
     response: Response,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
@@ -247,6 +257,13 @@ async def run_code(
     Jamais enregistrée comme soumission — c'est le filet de sécurité qui lève
     la peur de soumettre (PLAN.md 1b).
     """
+    settings = get_settings()
+    enforce_rate_limit(
+        request,
+        "submission.run",
+        limit=settings.run_ip_rate_limit_per_minute,
+        window_s=60,
+    )
     if len(payload.source_code.encode()) > MAX_SOURCE_BYTES:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "source_too_large")
     if (

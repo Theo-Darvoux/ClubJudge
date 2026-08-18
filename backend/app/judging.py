@@ -14,6 +14,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import joinedload
 
 from app import notify
+from app.config import get_settings
 from app.contests import invalidate_scoreboard
 from app.db import SessionLocal, as_utc
 from app.judge.base import Judge
@@ -30,7 +31,9 @@ class JudgeWorker:
         self._judge = judge
         self._session_factory = session_factory
         self._queue: asyncio.Queue[int] = asyncio.Queue()
-        self._task: asyncio.Task | None = None
+        self._tasks: list[asyncio.Task] = []
+        self._retry_attempts: dict[int, int] = {}
+        self._retry_tasks: set[asyncio.Task] = set()
 
     async def start(self) -> None:
         try:
@@ -49,13 +52,18 @@ class JudgeWorker:
             self._queue.put_nowait(submission_id)
         if pending:
             logger.info("re-enqueued %d pending submission(s)", len(pending))
-        self._task = asyncio.create_task(self._run())
+        concurrency = max(1, get_settings().judge_worker_concurrency)
+        self._tasks = [asyncio.create_task(self._run()) for _ in range(concurrency)]
 
     async def stop(self) -> None:
-        if self._task:
-            self._task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._task
+        for task in self._tasks:
+            task.cancel()
+        for task in list(self._retry_tasks):
+            task.cancel()
+        if self._tasks or self._retry_tasks:
+            await asyncio.gather(*self._tasks, *self._retry_tasks, return_exceptions=True)
+        self._tasks.clear()
+        self._retry_tasks.clear()
 
     def enqueue(self, submission_id: int) -> None:
         self._queue.put_nowait(submission_id)
@@ -73,6 +81,49 @@ class JudgeWorker:
                 raise
             except Exception:
                 logger.exception("unexpected error judging submission %d", submission_id)
+                self._mark_internal_error(submission_id)
+            finally:
+                self._queue.task_done()
+
+    def _schedule_retry(self, submission_id: int, exc: Exception) -> None:
+        attempt = self._retry_attempts.get(submission_id, 0)
+        delay = RETRY_DELAYS_S[min(attempt, len(RETRY_DELAYS_S) - 1)]
+        self._retry_attempts[submission_id] = attempt + 1
+        logger.warning(
+            "judge unreachable for submission %d (attempt %d, retry in %ds): %s",
+            submission_id,
+            attempt + 1,
+            delay,
+            exc,
+        )
+        with self._session_factory() as db:
+            submission = db.get(Submission, submission_id)
+            if submission is None or submission.status == SubmissionStatus.DONE:
+                return
+            submission.status = SubmissionStatus.QUEUED
+            db.commit()
+
+        async def requeue() -> None:
+            await asyncio.sleep(delay)
+            self.enqueue(submission_id)
+
+        task = asyncio.create_task(requeue())
+        self._retry_tasks.add(task)
+        task.add_done_callback(self._retry_tasks.discard)
+
+    def _mark_internal_error(self, submission_id: int) -> None:
+        """Never leave a RUNNING row stuck after an unexpected worker failure."""
+        with self._session_factory() as db:
+            submission = db.get(Submission, submission_id)
+            if submission is None or submission.status == SubmissionStatus.DONE:
+                return
+            submission.status = SubmissionStatus.DONE
+            submission.verdict = Verdict.INTERNAL_ERROR
+            submission.judged_at = datetime.now(UTC)
+            contest_id = submission.contest_id
+            db.commit()
+        if contest_id is not None:
+            invalidate_scoreboard(contest_id)
 
     async def _judge_one(self, submission_id: int) -> None:
         with self._session_factory() as db:
@@ -97,28 +148,18 @@ class JudgeWorker:
             submission.status = SubmissionStatus.RUNNING
             db.commit()
 
-        attempt = 0
-        while True:
-            try:
-                result = await self._judge.submit(
-                    source_code,
-                    language,
-                    tests,
-                    time_limit_s=time_limit_s,
-                    memory_limit_kb=memory_limit_kb,
-                )
-                break
-            except (httpx.HTTPError, TimeoutError) as exc:
-                delay = RETRY_DELAYS_S[min(attempt, len(RETRY_DELAYS_S) - 1)]
-                attempt += 1
-                logger.warning(
-                    "judge unreachable for submission %d (attempt %d, retry in %ds): %s",
-                    submission_id,
-                    attempt,
-                    delay,
-                    exc,
-                )
-                await asyncio.sleep(delay)
+        try:
+            result = await self._judge.submit(
+                source_code,
+                language,
+                tests,
+                time_limit_s=time_limit_s,
+                memory_limit_kb=memory_limit_kb,
+            )
+        except (httpx.HTTPError, TimeoutError) as exc:
+            self._schedule_retry(submission_id, exc)
+            return
+        self._retry_attempts.pop(submission_id, None)
 
         failed_test = next(
             (i + 1 for i, t in enumerate(result.tests) if t.verdict is not Verdict.ACCEPTED),

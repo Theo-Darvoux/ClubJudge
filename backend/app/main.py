@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from starlette.responses import JSONResponse
 
 from app import admin, auth, contests, courses, lsp, problems, skills, submissions
 from app.config import get_settings
@@ -11,6 +12,7 @@ from app.db import engine
 from app.judge import Judge0Judge
 from app.judging import JudgeWorker
 from app.notify import ContestAnnouncer
+from app.security import origin_allowed
 
 
 @asynccontextmanager
@@ -28,6 +30,35 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="ClubJudge API", version="0.1.0", lifespan=lifespan)
+
+_UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+@app.middleware("http")
+async def reject_cross_site_unsafe_requests(request: Request, call_next):
+    """CSRF defense for the cookie-authenticated API.
+
+    SameSite=Lax already blocks most cross-site cookie sends; validating Origin
+    on state-changing browser requests closes the remaining gap without requiring
+    a JS-readable CSRF token. Requests without Origin (CLI/health tooling) remain
+    accepted.
+    """
+    if request.method in _UNSAFE_METHODS:
+        forwarded_proto = request.headers.get("x-forwarded-proto")
+        scheme = (
+            forwarded_proto.split(",", 1)[0].strip()
+            if forwarded_proto
+            else request.url.scheme
+        )
+        if not origin_allowed(
+            request.headers.get("origin"),
+            host=request.headers.get("host", ""),
+            scheme=scheme,
+            allowed_origins=get_settings().cors_origins,
+        ):
+            return JSONResponse(status_code=403, content={"detail": "bad_origin"})
+    return await call_next(request)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,8 +88,8 @@ async def health() -> dict:
 
 
 @app.get("/api/health/deep")
-async def health_deep() -> dict:
-    """Liveness of the two services the API depends on. Admin/ops endpoint."""
+async def health_deep(_admin: auth.AdminUser) -> dict:
+    """Dependency health for authenticated administrators only."""
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))

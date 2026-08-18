@@ -26,6 +26,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session, load_only, selectinload
 
 from app import notify
+from app.audit import record_admin_action
 from app.auth import AdminUser, get_current_user
 from app.db import as_utc, get_db
 from app.judge.types import NON_ATTEMPT_VERDICTS, Verdict
@@ -697,6 +698,13 @@ def create_contest(
         problems=[ContestProblem(problem_id=pid, label=label) for pid, label in attached],
     )
     db.add(contest)
+    record_admin_action(
+        db,
+        admin,
+        "contest.create",
+        f"contest:{payload.slug}",
+        {"problem_count": len(attached)},
+    )
     db.commit()
     background.add_task(notify.contest_created, contest.title, contest.start_at, contest.end_at)
     return get_contest(payload.slug, db, admin)
@@ -710,6 +718,8 @@ def update_contest(
     admin: AdminUser,
 ) -> ContestDetail:
     contest = _load_contest(db, slug)
+    if contest_phase(contest, utcnow()) != "upcoming":
+        raise HTTPException(status.HTTP_409_CONFLICT, "contest_started")
     attached = _validate_payload(db, payload)
     if payload.slug != slug:
         # Le slug est l'identifiant public (URLs, annonces) : on ne le change pas.
@@ -719,6 +729,13 @@ def update_contest(
     contest.start_at = payload.start_at
     contest.end_at = payload.end_at
     _reconcile_problems(db, contest, attached)
+    record_admin_action(
+        db,
+        admin,
+        "contest.update",
+        f"contest:{slug}",
+        {"problem_count": len(attached)},
+    )
     db.commit()
     # Les colonnes (labels, problèmes) du classement ont pu changer.
     invalidate_scoreboard(contest.id)
@@ -737,6 +754,7 @@ def delete_contest(
     if contest_phase(contest, utcnow()) != "upcoming":
         raise HTTPException(status.HTTP_409_CONFLICT, "contest_started")
     contest_id = contest.id
+    record_admin_action(db, admin, "contest.delete", f"contest:{slug}")
     db.delete(contest)
     db.commit()
     invalidate_scoreboard(contest_id)

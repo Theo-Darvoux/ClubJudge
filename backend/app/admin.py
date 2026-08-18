@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.audit import record_admin_action
 from app.auth import AdminUser
 from app.db import get_db
 from app.judging import JudgeWorker
@@ -26,8 +27,10 @@ class RejudgeOut(BaseModel):
     rejudged: int
 
 
-def _reset_and_enqueue(db: Session, worker: JudgeWorker, submissions: list[Submission]) -> int:
+def _reset_submissions(submissions: list[Submission]) -> list[int]:
+    ids: list[int] = []
     for s in submissions:
+        ids.append(s.id)
         s.status = SubmissionStatus.QUEUED
         s.verdict = None
         s.time_s = None
@@ -35,10 +38,7 @@ def _reset_and_enqueue(db: Session, worker: JudgeWorker, submissions: list[Submi
         s.compile_output = None
         s.failed_test = None
         s.judged_at = None
-    db.commit()
-    for s in submissions:
-        worker.enqueue(s.id)
-    return len(submissions)
+    return ids
 
 
 @router.post("/submissions/{submission_id}/rejudge")
@@ -51,7 +51,14 @@ def rejudge_submission(
     submission = db.get(Submission, submission_id)
     if submission is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "submission_not_found")
-    return RejudgeOut(rejudged=_reset_and_enqueue(db, worker, [submission]))
+    ids = _reset_submissions([submission])
+    record_admin_action(
+        db, admin, "submission.rejudge", f"submission:{submission_id}"
+    )
+    db.commit()
+    for sid in ids:
+        worker.enqueue(sid)
+    return RejudgeOut(rejudged=len(ids))
 
 
 @router.post("/problems/{slug}/rejudge")
@@ -69,4 +76,15 @@ def rejudge_problem(
         .where(Submission.problem_id == problem.id)
         .order_by(Submission.created_at)
     ).all()
-    return RejudgeOut(rejudged=_reset_and_enqueue(db, worker, list(submissions)))
+    ids = _reset_submissions(list(submissions))
+    record_admin_action(
+        db,
+        admin,
+        "problem.rejudge",
+        f"problem:{slug}",
+        {"submission_count": len(ids)},
+    )
+    db.commit()
+    for sid in ids:
+        worker.enqueue(sid)
+    return RejudgeOut(rejudged=len(ids))

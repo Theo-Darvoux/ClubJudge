@@ -16,5 +16,12 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
 
+# Le backend lance aussi les processus LSP : ils ne doivent jamais hériter de
+# privilèges root dans le conteneur.
+RUN useradd --create-home --uid 10001 clubjudge \
+    && chown -R clubjudge:clubjudge /app
+USER clubjudge
+ENV PYTHONDONTWRITEBYTECODE=1
+
 EXPOSE 8000
 CMD ["uv", "run", "--no-dev", "fastapi", "run", "app/main.py", "--port", "8000"]

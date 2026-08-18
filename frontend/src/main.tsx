@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthProvider';
 import { Layout } from './components/Layout';
 import { RequireAuth } from './components/RequireAuth';
@@ -16,6 +16,7 @@ import { ProblemPage } from './pages/ProblemPage';
 import { ProblemsPage } from './pages/ProblemsPage';
 import { ProblemsDataProvider } from './problems/ProblemsDataProvider';
 import { SkillTreePage } from './pages/SkillTreePage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import './styles/global.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -45,8 +46,8 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/courses/:slug" element={<CoursePage />} />
               <Route path="/courses/:slug/:articleSlug" element={<ArticlePage />} />
               <Route path="/admin" element={<AdminPage />} />
+              <Route path="*" element={<NotFoundPage />} />
             </Route>
-            <Route path="*" element={<Navigate to="/problems" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

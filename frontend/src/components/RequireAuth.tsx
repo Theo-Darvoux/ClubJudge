@@ -8,6 +8,9 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const location = useLocation();
   if (loading) return <p className="mono-label boot-loading">{t.problems.loading}</p>;
-  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  if (!user) {
+    const from = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to="/login" state={{ from }} replace />;
+  }
   return children;
 }

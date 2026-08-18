@@ -4,6 +4,7 @@ Déblocage souple : l'état des nœuds (maîtrisé / recommandé / pas encore pr
 est purement visuel, aucun problème n'est verrouillé.
 """
 
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
@@ -12,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, load_only, selectinload
 
 from app.auth import get_current_user
+from app.contests import hidden_problem_ids
 from app.db import get_db
 from app.models import CourseArticle, Problem, Skill, SkillArticle, SkillProblem, User
 from app.progress import solved_attempted_ids
@@ -66,13 +68,19 @@ def get_tree(
     ).all()
     by_id = {s.id: s for s in skills}
 
+    # Même si le contenu est mal curé, un problème de contest non terminé ne
+    # doit jamais fuiter via l'arbre (titre, slug, difficulté ou progression).
+    hidden = hidden_problem_ids(db, datetime.now(UTC))
+    visible_problems = {
+        s.id: [sp for sp in s.problems if sp.problem_id not in hidden] for s in skills
+    }
+
     # Tenté = au moins une soumission, résolu = au moins un verdict ACCEPTED.
-    # Permet au panneau de l'arbre de distinguer « essayé sans réussir » de
-    # « jamais ouvert », comme la vue liste (logique partagée).
     solved_ids, attempted_ids = solved_attempted_ids(db, user.id)
 
     solved_count = {
-        s.id: sum(1 for sp in s.problems if sp.problem_id in solved_ids) for s in skills
+        s.id: sum(1 for sp in visible_problems[s.id] if sp.problem_id in solved_ids)
+        for s in skills
     }
     mastered = {s.id for s in skills if solved_count[s.id] >= s.mastery_threshold}
 
@@ -101,7 +109,7 @@ def get_tree(
                     solved=sp.problem_id in solved_ids,
                     attempted=sp.problem_id in attempted_ids,
                 )
-                for sp in s.problems
+                for sp in visible_problems[s.id]
             ],
             solved_count=solved_count[s.id],
             mastery_threshold=s.mastery_threshold,

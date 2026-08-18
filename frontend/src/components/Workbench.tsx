@@ -327,7 +327,8 @@ export function Workbench({
   // Les bandeaux d'erreur (import refusé, échec d'action) s'effacent seuls —
   // plus discrets qu'une window.alert bloquante.
   useAutoDismiss(uploadError, setUploadError);
-  useAutoDismiss(actionError, setActionError);
+  // Les erreurs d'action/réseau restent visibles jusqu'à fermeture explicite ou
+  // nouvelle action : cinq secondes étaient trop courtes pour un lecteur d'écran.
 
   // IntelliSense sémantique via les serveurs de langage côté serveur (basedpyright
   // pour Python, clangd pour C/C++, ocamllsp pour OCaml), relayés en WebSocket par
@@ -665,6 +666,24 @@ export function Workbench({
     if (frame) frame.style.height = `${defaultH}px`;
   }, [height]);
 
+  const onResizeKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      let next = editorHeight;
+      if (e.key === 'ArrowUp') next -= 20;
+      else if (e.key === 'ArrowDown') next += 20;
+      else if (e.key === 'Home') next = EDITOR_MIN_H;
+      else if (e.key === 'End') next = EDITOR_MAX_H;
+      else return;
+      e.preventDefault();
+      next = Math.min(EDITOR_MAX_H, Math.max(EDITOR_MIN_H, next));
+      setEditorHeight(next);
+      localStorage.setItem(HEIGHT_STORAGE_KEY, String(next));
+      const frame = editorFrameRef.current;
+      if (frame) frame.style.height = `${next}px`;
+    },
+    [editorHeight],
+  );
+
   // Le code courant/sauvegardé diffère-t-il du modèle vierge du langage ?
   // Garde-fou commun aux actions qui écrasent l'éditeur (réinitialisation, import, réutilisation).
   function isLanguageCodeModified(lang: SubmissionLanguage) {
@@ -782,6 +801,7 @@ export function Workbench({
             className={`tool-btn${copied ? ' is-success' : ''}`}
             onClick={copyCode}
             title={copied ? t.problem.copied : t.problem.copy_code}
+            aria-label={copied ? t.problem.copied : t.problem.copy_code}
           >
             {copied ? IconCheck : IconCopy}
           </button>
@@ -790,6 +810,7 @@ export function Workbench({
             className="tool-btn"
             onClick={downloadCode}
             title={t.problem.download_code}
+            aria-label={t.problem.download_code}
           >
             {IconDownload}
           </button>
@@ -798,6 +819,7 @@ export function Workbench({
             className="tool-btn"
             onClick={() => fileInputRef.current?.click()}
             title={t.problem.upload_code}
+            aria-label={t.problem.upload_code}
           >
             {IconUpload}
           </button>
@@ -816,6 +838,7 @@ export function Workbench({
             className="tool-btn"
             onClick={resetTemplate}
             title={t.problem.reset_template}
+            aria-label={t.problem.reset_template}
           >
             {IconReset}
           </button>
@@ -886,8 +909,14 @@ export function Workbench({
           className="editor-resize"
           onPointerDown={onResizeStart}
           onDoubleClick={onResizeReset}
+          onKeyDown={onResizeKeyDown}
           role="separator"
           aria-orientation="horizontal"
+          aria-label={t.problem.resize_editor}
+          aria-valuemin={EDITOR_MIN_H}
+          aria-valuemax={EDITOR_MAX_H}
+          aria-valuenow={editorHeight}
+          tabIndex={0}
           title={t.problem.resize_editor}
         >
           <span className="editor-resize-grip" aria-hidden="true" />
@@ -953,6 +982,7 @@ export function Workbench({
       {showCustom && (
         <div className="custom-input">
           <textarea
+            aria-label={t.problem.custom_input_toggle}
             value={customInput}
             onChange={(e) => setCustomInput(e.target.value)}
             placeholder={t.problem.custom_input_placeholder}

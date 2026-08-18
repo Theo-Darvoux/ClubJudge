@@ -8,7 +8,12 @@
 git pull
 docker compose --profile full up -d --build
 docker compose exec backend uv run alembic upgrade head
+docker compose exec backend uv run clubjudge-content import /content
 ```
+
+Le profil `full` monte `./content` en lecture seule dans `/content`. L'import est
+volontairement explicite : il valide les solutions de référence via Judge0 avant
+de synchroniser problèmes, cours et arbre de compétences.
 
 Un reverse proxy TLS (Caddy ou nginx sur l'hôte) doit pointer vers
 `127.0.0.1:5173` (front, qui proxifie `/api` vers le backend).
@@ -29,12 +34,28 @@ Un reverse proxy TLS (Caddy ou nginx sur l'hôte) doit pointer vers
          flags à `false`. À trancher avant le premier contest (test de charge).
 - [ ] Vérifier que le port Judge0 (2358) n'est PAS accessible depuis l'extérieur.
 - [ ] SMTP disponible ? (conditionne la vérification d'email en Phase 1a)
-- [ ] `GET /api/health/deep` répond `{"database": "ok", "judge0": "ok"}`.
+- [ ] `GET /api/health` répond `{"status": "ok", ...}` sans authentification.
+- [ ] Depuis une session administrateur, `GET /api/health/deep` indique `database=ok`
+      et `judge0=ok`. Cet endpoint n'est plus public.
 
 ## Sauvegardes
 
-À mettre en place dès les premiers vrais utilisateurs (Phase 1a) :
-dump PostgreSQL quotidien + test de restauration documenté ici.
+Créer un dump PostgreSQL compressé :
+
+```sh
+./scripts/backup-db.sh
+```
+
+Vérifier réellement qu'un dump se restaure dans une base temporaire du même
+serveur PostgreSQL (la base temporaire est supprimée automatiquement) :
+
+```sh
+./scripts/verify-backup.sh backups/clubjudge-YYYYMMDDTHHMMSSZ.dump
+```
+
+Automatiser `backup-db.sh` quotidiennement côté hôte, copier les dumps hors de la
+machine et exécuter `verify-backup.sh` régulièrement. Un backup non restauré en
+test n'est pas considéré comme valide.
 
 ## Administration
 

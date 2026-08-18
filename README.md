@@ -4,8 +4,6 @@ Plateforme de programmation compétitive du **Club Code de Télécom SudParis**.
 Trois sections : liste de problèmes (arbre de compétences), compétitions, cours
 avec TP interactifs.
 
-Le plan complet du projet vit dans [`PLAN.md`](PLAN.md) — c'est la source de vérité.
-
 ## Structure du monorepo
 
 ```

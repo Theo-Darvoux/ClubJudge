@@ -10,7 +10,10 @@ n'exécute rien. L'exécution réelle reste du ressort de Judge0.
 """
 
 import asyncio
+import contextlib
+import os
 import shutil
+import signal
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -18,8 +21,11 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.auth import SESSION_COOKIE, _token_hash
+from app.config import get_settings
 from app.db import as_utc, get_db
 from app.models import User, UserSession
+from app.rate_limit import consume_rate_limit
+from app.security import origin_allowed
 
 router = APIRouter(prefix="/api", tags=["lsp"])
 
@@ -36,6 +42,35 @@ LANGUAGE_SERVERS: dict[str, tuple[str, list[str]]] = {
     "python": ("basedpyright-langserver", ["--stdio"]),
     "ocaml": ("ocamllsp", []),
 }
+
+_active_lock = asyncio.Lock()
+_active_total = 0
+_active_by_user: dict[int, int] = {}
+
+
+async def _reserve_session(user_id: int) -> bool:
+    global _active_total
+    settings = get_settings()
+    async with _active_lock:
+        mine = _active_by_user.get(user_id, 0)
+        if _active_total >= settings.lsp_max_sessions_global:
+            return False
+        if mine >= settings.lsp_max_sessions_per_user:
+            return False
+        _active_total += 1
+        _active_by_user[user_id] = mine + 1
+        return True
+
+
+async def _release_session(user_id: int) -> None:
+    global _active_total
+    async with _active_lock:
+        mine = _active_by_user.get(user_id, 0)
+        if mine <= 1:
+            _active_by_user.pop(user_id, None)
+        else:
+            _active_by_user[user_id] = mine - 1
+        _active_total = max(0, _active_total - 1)
 
 
 def _frame(message: str) -> bytes:
@@ -83,8 +118,41 @@ async def lsp_proxy(
         await websocket.close(code=1003, reason="unsupported_language")
         return
 
-    if _authenticate(websocket, db) is None:
+    settings = get_settings()
+    forwarded_proto = websocket.headers.get("x-forwarded-proto")
+    scheme = (
+        forwarded_proto.split(",", 1)[0].strip()
+        if forwarded_proto
+        else ("https" if websocket.url.scheme == "wss" else "http")
+    )
+    if not origin_allowed(
+        websocket.headers.get("origin"),
+        host=websocket.headers.get("host", ""),
+        scheme=scheme,
+        allowed_origins=settings.cors_origins,
+    ):
+        await websocket.close(code=1008, reason="bad_origin")
+        return
+
+    user = _authenticate(websocket, db)
+    if user is None:
         await websocket.close(code=1008, reason="unauthenticated")
+        return
+
+    forwarded = websocket.headers.get("x-forwarded-for")
+    ip = (
+        forwarded.split(",", 1)[0].strip()
+        if forwarded
+        else (websocket.client.host if websocket.client else "unknown")
+    )
+    retry_after = consume_rate_limit(
+        "lsp.connect",
+        ip,
+        limit=settings.lsp_connect_rate_limit_per_minute,
+        window_s=60,
+    )
+    if retry_after is not None:
+        await websocket.close(code=1013, reason="rate_limited")
         return
 
     binary, args = server
@@ -96,23 +164,35 @@ async def lsp_proxy(
         await websocket.close(code=1011, reason="server_unavailable")
         return
 
+    if not await _reserve_session(user.id):
+        await websocket.close(code=1013, reason="too_many_lsp_sessions")
+        return
+
     await websocket.accept()
 
-    process = await asyncio.create_subprocess_exec(
-        binary_path,
-        *args,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
+    process: asyncio.subprocess.Process | None = None
+    try:
+        process = await asyncio.create_subprocess_exec(
+            binary_path,
+            *args,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        await _release_session(user.id)
+        await websocket.close(code=1011, reason="server_unavailable")
+        return
     assert process.stdin is not None and process.stdout is not None
     stdin, stdout = process.stdin, process.stdout
 
     async def browser_to_server() -> None:
         while True:
             message = await websocket.receive_text()
-            if len(message) > MAX_MESSAGE_BYTES:
-                continue  # on ignore les trames anormalement grosses
+            if len(message.encode("utf-8")) > MAX_MESSAGE_BYTES:
+                await websocket.close(code=1009, reason="message_too_large")
+                return
             stdin.write(_frame(message))
             await stdin.drain()
 
@@ -126,9 +206,13 @@ async def lsp_proxy(
     t1 = asyncio.create_task(browser_to_server())
     t2 = asyncio.create_task(server_to_browser())
     try:
-        done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
-        for task in done:
-            task.result()
+        async with asyncio.timeout(settings.lsp_session_ttl_s):
+            done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                task.result()
+    except TimeoutError:
+        with contextlib.suppress(RuntimeError):
+            await websocket.close(code=1000, reason="session_expired")
     except WebSocketDisconnect:
         pass
     except (ConnectionError, asyncio.IncompleteReadError):
@@ -136,9 +220,14 @@ async def lsp_proxy(
     finally:
         t1.cancel()
         t2.cancel()
+        await asyncio.gather(t1, t2, return_exceptions=True)
         if process.returncode is None:
-            process.terminate()
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGTERM)
             try:
                 await asyncio.wait_for(process.wait(), timeout=5)
             except TimeoutError:
-                process.kill()
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(process.pid, signal.SIGKILL)
+                await process.wait()
+        await _release_session(user.id)

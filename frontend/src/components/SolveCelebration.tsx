@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useContext, useState } from 'react';
+import { useEffect, useMemo, useContext, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import type { ProblemDetail, ProblemSummary } from '../api';
@@ -91,6 +91,8 @@ export function SolveCelebration({
   const { t } = useI18n();
   const ctx = useContext(ProblemsDataContext);
   const [fetchedProblems, setFetchedProblems] = useState<ProblemSummary[] | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!ctx) {
@@ -100,21 +102,60 @@ export function SolveCelebration({
 
   const problems = ctx?.problems ?? fetchedProblems;
 
-  // Échap pour fermer, et fermeture auto des confettis laissée à l'overlay.
+  // Vraie modale clavier : focus initial, trap Tab, Échap et restauration du
+  // focus sur le contrôle qui a déclenché la célébration.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !cardRef.current) return;
+      const focusable = Array.from(
+        cardRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      previous?.focus();
+    };
   }, [onClose]);
 
   const next = problems ? pickNext(problems, problem) : [];
 
   return (
-    <div className="celebrate-overlay" onClick={onClose} role="dialog" aria-modal="true">
+    <div
+      className="celebrate-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="solve-celebration-title"
+    >
       <Confetti />
-      <div className="celebrate-card" onClick={(e) => e.stopPropagation()}>
+      <div ref={cardRef} className="celebrate-card" onClick={(e) => e.stopPropagation()}>
         <p className="celebrate-kicker mono-label">{t.problem.celebrate_kicker}</p>
-        <h2 className="celebrate-title">{t.problem.celebrate_title}</h2>
+        <h2 id="solve-celebration-title" className="celebrate-title">
+          {t.problem.celebrate_title}
+        </h2>
         {loading ? (
           <span className="attempt-badge is-loading" aria-hidden="true" />
         ) : (
@@ -144,7 +185,12 @@ export function SolveCelebration({
           </div>
         )}
 
-        <button type="button" className="btn btn-ghost celebrate-close" onClick={onClose}>
+        <button
+          ref={closeRef}
+          type="button"
+          className="btn btn-ghost celebrate-close"
+          onClick={onClose}
+        >
           {t.problem.celebrate_continue}
         </button>
       </div>

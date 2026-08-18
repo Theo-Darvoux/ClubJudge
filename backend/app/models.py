@@ -53,6 +53,23 @@ class UserSession(Base):
     user: Mapped[User] = relationship()
 
 
+class AdminAuditLog(Base):
+    __tablename__ = "admin_audit_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    admin_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    action: Mapped[str] = mapped_column(String(64), index=True)
+    target: Mapped[str] = mapped_column(String(256))
+    details: Mapped[str | None] = mapped_column(Text, default=None)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+    admin: Mapped[User | None] = relationship()
+
+
 class Problem(Base):
     __tablename__ = "problems"
 

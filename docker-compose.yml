@@ -45,6 +45,9 @@ services:
     command: ["./scripts/workers"]
     env_file: judge0/judge0.conf
     privileged: true
+    pids_limit: ${JUDGE0_PIDS_LIMIT:-512}
+    mem_limit: ${JUDGE0_CONTAINER_MEMORY:-2g}
+    cpus: ${JUDGE0_CPUS:-2.0}
     depends_on:
       - judge0-db
       - judge0-redis
@@ -73,6 +76,19 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-clubjudge}:${POSTGRES_PASSWORD:-clubjudge}@db:5432/${POSTGRES_DB:-clubjudge}
       JUDGE0_URL: http://judge0-server:2358
+      SECURE_COOKIES: ${SECURE_COOKIES:-true}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      SUBMISSION_COOLDOWN_S: ${SUBMISSION_COOLDOWN_S:-10}
+      CONTENT_DIR: /content
+    volumes:
+      - ./content:/content:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: ${BACKEND_PIDS_LIMIT:-256}
+    mem_limit: ${BACKEND_MEMORY_LIMIT:-2g}
+    cpus: ${BACKEND_CPUS:-2.0}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -94,7 +110,9 @@ services:
 
 networks:
   judge0:
-    internal: false # passer à `true` en prod si les images n'ont pas besoin d'Internet
+    # Judge0 n'a besoin d'aucun accès Internet pour juger : ce réseau ne doit
+    # fournir qu'une connectivité entre l'API, le serveur, Redis et PostgreSQL.
+    internal: true
 
 volumes:
   pgdata:

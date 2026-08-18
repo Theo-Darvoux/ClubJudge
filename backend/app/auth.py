@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import as_utc, get_db
 from app.models import Role, User, UserSession
+from app.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -56,7 +57,11 @@ def get_current_user(request: Request, db: Annotated[Session, Depends(get_db)]) 
     if not token:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
     session = db.get(UserSession, _token_hash(token))
-    if session is None or as_utc(session.expires_at) < datetime.now(UTC):
+    if session is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired")
+    if as_utc(session.expires_at) < datetime.now(UTC):
+        db.delete(session)
+        db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired")
     return session.user
 
@@ -81,7 +86,7 @@ class RegisterPayload(BaseModel):
 
 class LoginPayload(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=128)
 
 
 class UserOut(BaseModel):
@@ -93,8 +98,18 @@ class UserOut(BaseModel):
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(
-    payload: RegisterPayload, response: Response, db: Annotated[Session, Depends(get_db)]
+    payload: RegisterPayload,
+    request: Request,
+    response: Response,
+    db: Annotated[Session, Depends(get_db)],
 ) -> UserOut:
+    settings = get_settings()
+    enforce_rate_limit(
+        request,
+        "auth.register",
+        limit=settings.register_rate_limit_per_hour,
+        window_s=3600,
+    )
     email = payload.email.lower()
     exists = db.scalar(select(User).where(func.lower(User.email) == email))
     if exists:
@@ -112,8 +127,18 @@ def register(
 
 @router.post("/login")
 def login(
-    payload: LoginPayload, response: Response, db: Annotated[Session, Depends(get_db)]
+    payload: LoginPayload,
+    request: Request,
+    response: Response,
+    db: Annotated[Session, Depends(get_db)],
 ) -> UserOut:
+    settings = get_settings()
+    enforce_rate_limit(
+        request,
+        "auth.login",
+        limit=settings.login_rate_limit_per_minute,
+        window_s=60,
+    )
     user = db.scalar(select(User).where(func.lower(User.email) == payload.email.lower()))
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "bad_credentials")

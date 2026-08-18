@@ -290,9 +290,11 @@ export function AdminPage() {
                 </div>
                 <div className="admin-contest-actions">
                   <span className={`phase-chip is-${c.phase}`}>{t.contests[c.phase]}</span>
-                  <button className="nav-ghost-btn" onClick={() => openEdit(c.slug)}>
-                    {t.admin.edit_contest}
-                  </button>
+                  {c.phase === 'upcoming' && (
+                    <button className="nav-ghost-btn" onClick={() => openEdit(c.slug)}>
+                      {t.admin.edit_contest}
+                    </button>
+                  )}
                   {c.phase === 'upcoming' && (
                     <button className="nav-ghost-btn" onClick={() => remove(c.slug)}>
                       {t.admin.delete_contest}
@@ -310,6 +312,7 @@ export function AdminPage() {
         <p className="contest-note">{t.admin.rejudge_hint}</p>
         <div className="admin-rejudge-row">
           <input
+            aria-label={t.admin.rejudge_problem_placeholder}
             placeholder={t.admin.rejudge_problem_placeholder}
             value={rejudgeProblem}
             onChange={(e) => setRejudgeProblem(e.target.value)}
@@ -324,6 +327,7 @@ export function AdminPage() {
         </div>
         <div className="admin-rejudge-row">
           <input
+            aria-label={t.admin.rejudge_submission_placeholder}
             placeholder={t.admin.rejudge_submission_placeholder}
             value={rejudgeSubmission}
             onChange={(e) => setRejudgeSubmission(e.target.value)}
