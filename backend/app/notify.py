@@ -135,7 +135,7 @@ class ContestAnnouncer:
             for contest in finished:
                 contest.results_announced = True
                 db.commit()
-                board = build_scoreboard(db, contest, now, me=None)
+                board = build_scoreboard(db, contest, me=None)
                 podium = [
                     (row.rank, row.display_name, row.solved, row.penalty_min)
                     for row in board.rows[:3]

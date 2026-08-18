@@ -314,6 +314,7 @@ class ContestProblem(Base):
     contest_id: Mapped[int] = mapped_column(ForeignKey("contests.id", ondelete="CASCADE"))
     problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id", ondelete="CASCADE"))
     label: Mapped[str] = mapped_column(String(2))  # lettre ICPC : A, B, C…
+    first_blood_announced: Mapped[bool] = mapped_column(Boolean, default=False)
 
     contest: Mapped[Contest] = relationship(back_populates="problems")
     problem: Mapped[Problem] = relationship()

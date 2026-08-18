@@ -35,6 +35,11 @@ export function CodeBlock({
     () => hljs.highlight(code, { language: HLJS_LANG[language] }).value,
     [code, language],
   );
+  // Sûreté XSS : ce bloc rend le code source d'AUTRES membres (onglet
+  // « solutions »). `hljs.highlight` échappe le texte (`<`, `&`…) avant d'y
+  // intercaler ses propres balises <span>, donc le HTML injecté est sûr tant que
+  // l'entrée passe par `highlight` (jamais par interpolation brute). Ne pas
+  // passer ici de HTML construit autrement.
   return (
     <pre className={className}>
       <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />

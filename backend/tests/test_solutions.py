@@ -76,10 +76,34 @@ def test_solutions_keep_best_per_member_and_language(client, db, problem):
     )
     body = client.get("/api/problems/deux-sommes/solutions").json()
 
-    # Une entrée par (membre, langage), la plus rapide, triées par temps.
-    assert [(s["author"], s["language"], s["source_code"]) for s in body] == [
-        ("Alice", "cpp", "int main(){}"),
-        ("Alice", "python", "rapide"),
-        ("Alice", "python", "print(5)"),
+    # Une entrée par (membre, langage), la plus rapide, triées par temps. Le
+    # percentile n'est renseigné que pour ses PROPRES solutions (cf. ci-dessous) :
+    # ici Alice ne le voit que sur sa ligne, None sur celles de Bob.
+    assert [(s["author"], s["language"], s["source_code"], s["percentile"]) for s in body] == [
+        ("Bob", "cpp", "int main(){}", None),
+        ("Bob", "python", "rapide", None),
+        ("Alice", "python", "print(5)", 0),
     ]
     assert [s["is_mine"] for s in body] == [False, False, True]
+
+
+def test_percentile_only_computed_for_own_solutions(client, db, problem):
+    """« Plus rapide que X % » est calculé sur tous les résolveurs (le classement),
+    mais n'est renvoyé que pour les lignes de l'appelant — jamais pour celles des
+    autres, que le client n'affiche pas."""
+    me = register(client)
+    other = register(client, email="bob@example.org")
+
+    # Bob est le plus rapide en Python : sur sa propre vue, il doit donc voir un
+    # percentile élevé (plus rapide qu'Alice), et None sur la ligne d'Alice.
+    _add_ac(db, me["id"], problem.id, time_s=0.08)
+    _add_ac(db, other["id"], problem.id, time_s=0.02, source="rapide")
+
+    # `register` a connecté Bob en dernier : on reste donc Bob.
+    body = client.get("/api/problems/deux-sommes/solutions").json()
+    by_author = {s["author"]: s for s in body}
+
+    assert by_author["Bob"]["is_mine"] is True
+    assert by_author["Bob"]["percentile"] == 100  # plus rapide que l'unique autre
+    assert by_author["Alice"]["is_mine"] is False
+    assert by_author["Alice"]["percentile"] is None  # jamais exposé pour autrui

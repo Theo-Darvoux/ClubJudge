@@ -123,15 +123,19 @@ async def lsp_proxy(
                 return
             await websocket.send_text(message)
 
-    pump = asyncio.gather(browser_to_server(), server_to_browser())
+    t1 = asyncio.create_task(browser_to_server())
+    t2 = asyncio.create_task(server_to_browser())
     try:
-        await pump
+        done, pending = await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
+        for task in done:
+            task.result()
     except WebSocketDisconnect:
         pass
     except (ConnectionError, asyncio.IncompleteReadError):
         pass
     finally:
-        pump.cancel()
+        t1.cancel()
+        t2.cancel()
         if process.returncode is None:
             process.terminate()
             try:

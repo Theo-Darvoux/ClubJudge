@@ -35,6 +35,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # En-têtes de réponse que le JS du navigateur peut lire en cross-origin. Sans
+    # cela, un en-tête non « safelisté » comme le cooldown (ou Retry-After) reste
+    # invisible côté client une fois le frontend servi depuis une autre origine.
+    expose_headers=[submissions.COOLDOWN_HEADER, "Retry-After"],
 )
 
 app.include_router(admin.router)

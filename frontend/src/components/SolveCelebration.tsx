@@ -4,6 +4,7 @@ import { api } from '../api';
 import type { ProblemDetail, ProblemSummary } from '../api';
 import { useI18n } from '../i18n/context';
 import { ProblemsDataContext } from '../problems/context';
+import { attemptLabel } from '../problems/attempts';
 import { DifficultyDots } from './badges';
 
 const CONFETTI_COLORS = ['#dcb7ff', '#7fe0a7', '#ffd27f', '#ff8b9e', '#ffab7f'];
@@ -19,15 +20,20 @@ function seeded(n: number): number {
 function Confetti() {
   const pieces = useMemo(
     () =>
-      Array.from({ length: CONFETTI_COUNT }, (_, i) => ({
-        key: i,
-        left: seeded(i + 1) * 100,
-        delay: seeded(i + 2) * 0.6,
-        duration: 1.8 + seeded(i + 3) * 1.4,
-        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-        rotate: seeded(i + 4) * 360,
-        drift: (seeded(i + 5) - 0.5) * 120,
-      })),
+      Array.from({ length: CONFETTI_COUNT }, (_, i) => {
+        // Bloc de graines disjoint par pièce (s+1..s+5) : sinon la graine d'une
+        // pièce recouvre celle de la suivante et corrèle leurs trajectoires.
+        const s = i * 5;
+        return {
+          key: i,
+          left: seeded(s + 1) * 100,
+          delay: seeded(s + 2) * 0.6,
+          duration: 1.8 + seeded(s + 3) * 1.4,
+          color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+          rotate: seeded(s + 4) * 360,
+          drift: (seeded(s + 5) - 0.5) * 120,
+        };
+      }),
     [],
   );
   return (
@@ -57,23 +63,29 @@ function pickNext(
   all: ProblemSummary[],
   current: ProblemDetail,
 ): ProblemSummary[] {
-  const candidates = all.filter((p) => p.slug !== current.slug && !p.solved);
   const score = (p: ProblemSummary) => {
     const harder = p.difficulty >= current.difficulty ? 0 : 50;
     const dist = Math.abs(p.difficulty - current.difficulty);
     const sharedTags = p.tags.filter((tg) => current.tags.includes(tg)).length;
     return harder + dist * 10 - sharedTags * 5;
   };
-  return [...candidates].sort((a, b) => score(a) - score(b)).slice(0, 3);
+  return all
+    .filter((p) => p.slug !== current.slug && !p.solved)
+    .map((p) => ({ p, score: score(p) }))
+    .sort((a, b) => a.score - b.score)
+    .map((x) => x.p)
+    .slice(0, 3);
 }
 
 export function SolveCelebration({
   problem,
   attempts,
+  loading = false,
   onClose,
 }: {
   problem: ProblemDetail;
   attempts: number | null;
+  loading?: boolean;
   onClose: () => void;
 }) {
   const { t } = useI18n();
@@ -103,10 +115,14 @@ export function SolveCelebration({
       <div className="celebrate-card" onClick={(e) => e.stopPropagation()}>
         <p className="celebrate-kicker mono-label">{t.problem.celebrate_kicker}</p>
         <h2 className="celebrate-title">{t.problem.celebrate_title}</h2>
-        {attempts != null && (
-          <span className={`attempt-badge${attempts === 1 ? ' is-first' : ''}`}>
-            {attempts === 1 ? t.problem.first_try : t.problem.solved_in_tries(attempts)}
-          </span>
+        {loading ? (
+          <span className="attempt-badge is-loading" aria-hidden="true" />
+        ) : (
+          attempts != null && (
+            <span className={`attempt-badge${attempts === 1 ? ' is-first' : ''}`}>
+              {attemptLabel(t, attempts)}
+            </span>
+          )
         )}
 
         {next.length > 0 && (
@@ -128,7 +144,7 @@ export function SolveCelebration({
           </div>
         )}
 
-        <button className="btn btn-ghost celebrate-close" onClick={onClose}>
+        <button type="button" className="btn btn-ghost celebrate-close" onClick={onClose}>
           {t.problem.celebrate_continue}
         </button>
       </div>

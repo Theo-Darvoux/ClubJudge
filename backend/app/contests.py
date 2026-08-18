@@ -13,6 +13,9 @@ pénalité = somme, sur les problèmes résolus, de (minute du premier AC
 
 import math
 import re
+import threading
+import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Literal
@@ -20,12 +23,12 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import Select, func, select
-from sqlalchemy.orm import Session, defer, load_only, selectinload
+from sqlalchemy.orm import Session, load_only, selectinload
 
 from app import notify
 from app.auth import AdminUser, get_current_user
 from app.db import as_utc, get_db
-from app.judge.types import Verdict
+from app.judge.types import NON_ATTEMPT_VERDICTS, Verdict
 from app.models import (
     Contest,
     ContestProblem,
@@ -36,14 +39,15 @@ from app.models import (
     User,
 )
 from app.progress import solved_attempted_ids
-from app.schemas import ProblemRef
+from app.schemas import AttemptedProblemRef
 
 router = APIRouter(prefix="/api/contests", tags=["contests"])
 
 PENALTY_PER_REJECT_MIN = 20
-# Verdicts qui ne coûtent pas de pénalité : la compilation ratée n'a jamais
+# Verdicts qui ne coûtent pas de pénalité = verdicts qui ne comptent pas comme une
+# tentative jugée (cf. NON_ATTEMPT_VERDICTS) : la compilation ratée n'a jamais
 # tourné, l'erreur interne n'est pas la faute du participant.
-NO_PENALTY_VERDICTS = {Verdict.COMPILATION_ERROR, Verdict.INTERNAL_ERROR}
+NO_PENALTY_VERDICTS = NON_ATTEMPT_VERDICTS
 
 SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 LABEL_RE = re.compile(r"^[A-Z][0-9]?$")
@@ -170,6 +174,12 @@ def compute_scores(
     tries: dict[tuple[int, int], int] = {}
     solved_at: dict[tuple[int, int], int] = {}
     pending: set[tuple[int, int]] = set()
+    # Premier AC de chaque problème, dans l'ordre chronologique (created_at, id) :
+    # comme on itère déjà dans cet ordre, le premier AC rencontré EST le premier
+    # sang. Même définition que l'annonce Discord (judging._maybe_first_blood), pour
+    # que le ballon du scoreboard et le nom annoncé désignent toujours la même
+    # personne — y compris à égalité de minute (l'ordre par id départage).
+    first_blood: dict[int, int] = {}  # problem_id -> user_id
 
     for sub in sorted(submissions, key=lambda s: (as_utc(s.created_at), s.id)):
         key = (sub.user_id, sub.problem_id)
@@ -181,14 +191,9 @@ def compute_scores(
         if sub.verdict == Verdict.ACCEPTED:
             minute = math.floor((as_utc(sub.created_at) - start).total_seconds() / 60)
             solved_at[key] = max(0, minute)
+            first_blood.setdefault(sub.problem_id, sub.user_id)
         elif sub.verdict not in NO_PENALTY_VERDICTS:
             tries[key] = tries.get(key, 0) + 1
-
-    first_blood: dict[int, int] = {}  # problem_id -> user_id
-    for (user_id, problem_id), minute in solved_at.items():
-        best = first_blood.get(problem_id)
-        if best is None or minute < solved_at[(best, problem_id)]:
-            first_blood[problem_id] = user_id
 
     rows = []
     for user_id in user_ids:
@@ -201,7 +206,9 @@ def compute_scores(
                 tries=tries.get(key, 0),
                 solved_at_min=minute,
                 first_blood=first_blood.get(problem_id) == user_id,
-                pending=key in pending,
+                # « En attente » ne concerne qu'un problème non encore résolu : une
+                # soumission en file derrière un AC ne doit pas rallumer la pastille.
+                pending=key in pending and minute is None,
             )
             if minute is not None:
                 solved += 1
@@ -235,8 +242,11 @@ class ContestSummary(BaseModel):
     registered: bool
 
 
-class ContestProblemOut(ProblemRef):
+class ContestProblemOut(AttemptedProblemRef):
     label: str
+    # Éditorial disponible : renseigné seulement une fois le contest terminé
+    # (conditions ICPC — fermé pendant la fenêtre, rouvert à l'upsolving).
+    has_editorial: bool = False
 
 
 class ContestDetail(ContestSummary):
@@ -255,6 +265,10 @@ class ScoreCellOut(BaseModel):
 
 class ScoreRowOut(BaseModel):
     rank: int
+    # Identité stable de la ligne : `display_name` n'est pas unique (cf. User),
+    # donc c'est `user_id` qui sert de clé côté client (React key, animation FLIP,
+    # diff entre rafraîchissements). Le nom reste purement de l'affichage.
+    user_id: int
     display_name: str
     is_me: bool
     solved: int
@@ -263,7 +277,6 @@ class ScoreRowOut(BaseModel):
 
 
 class ScoreboardOut(BaseModel):
-    phase: Phase
     problems: list[str]  # labels, dans l'ordre
     rows: list[ScoreRowOut]
 
@@ -284,6 +297,7 @@ def _load_contest(db: Session, slug: str) -> Contest:
 
 
 def _registration_counts(db: Session, contest_ids: list[int]) -> dict[int, int]:
+    """Nombre d'inscrits par contest, en une seule requête groupée."""
     if not contest_ids:
         return {}
     rows = db.execute(
@@ -294,16 +308,30 @@ def _registration_counts(db: Session, contest_ids: list[int]) -> dict[int, int]:
     return dict(rows)
 
 
+def _problem_counts(db: Session, contest_ids: list[int]) -> dict[int, int]:
+    """Nombre de problèmes par contest, en une seule requête groupée — la liste
+    n'a pas besoin de matérialiser les lignes `ContestProblem` rien que pour les
+    compter."""
+    if not contest_ids:
+        return {}
+    rows = db.execute(
+        select(ContestProblem.contest_id, func.count())
+        .where(ContestProblem.contest_id.in_(contest_ids))
+        .group_by(ContestProblem.contest_id)
+    ).all()
+    return dict(rows)
+
+
 @router.get("")
 def list_contests(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> list[ContestSummary]:
     now = utcnow()
-    contests = db.scalars(
-        select(Contest).options(selectinload(Contest.problems)).order_by(Contest.start_at.desc())
-    ).all()
-    counts = _registration_counts(db, [c.id for c in contests])
+    contests = db.scalars(select(Contest).order_by(Contest.start_at.desc())).all()
+    ids = [c.id for c in contests]
+    reg_counts = _registration_counts(db, ids)
+    prob_counts = _problem_counts(db, ids)
     mine = set(
         db.scalars(
             select(ContestRegistration.contest_id).where(ContestRegistration.user_id == user.id)
@@ -316,8 +344,8 @@ def list_contests(
             phase=contest_phase(c, now),
             start_at=as_utc(c.start_at),
             end_at=as_utc(c.end_at),
-            problem_count=len(c.problems),
-            registered_count=counts.get(c.id, 0),
+            problem_count=prob_counts.get(c.id, 0),
+            registered_count=reg_counts.get(c.id, 0),
             registered=c.id in mine,
         )
         for c in contests
@@ -345,7 +373,22 @@ def get_contest(
 
     problems: list[ContestProblemOut] | None = None
     if phase == "finished" or (phase == "running" and registered):
-        solved_ids, _ = solved_attempted_ids(db, user.id)
+        problem_ids = [cp.problem_id for cp in contest.problems]
+        # On ne lit la progression que sur les énoncés du contest : pas de scan de
+        # tout l'historique de soumissions du membre pour une poignée de problèmes.
+        solved_ids, attempted_ids = solved_attempted_ids(db, user.id, problem_ids)
+        # Présence d'un éditorial : seulement une fois terminé (à l'upsolving) —
+        # un seul SELECT sur les problèmes du contest, sans matérialiser le texte.
+        editorial_ids: set[int] = set()
+        if phase == "finished":
+            editorial_ids = set(
+                db.scalars(
+                    select(Problem.id).where(
+                        Problem.id.in_(problem_ids),
+                        Problem.editorial_fr.is_not(None),
+                    )
+                )
+            )
         problems = [
             ContestProblemOut(
                 label=cp.label,
@@ -353,6 +396,8 @@ def get_contest(
                 title=cp.problem.title,
                 difficulty=cp.problem.difficulty,
                 solved=cp.problem_id in solved_ids,
+                attempted=cp.problem_id in attempted_ids,
+                has_editorial=cp.problem_id in editorial_ids,
             )
             for cp in contest.problems
         ]
@@ -389,6 +434,8 @@ def register_to_contest(
     if exists is None:
         db.add(ContestRegistration(contest_id=contest.id, user_id=user.id))
         db.commit()
+        # Un inscrit de plus = une ligne de plus au classement (même à 0 résolu).
+        invalidate_scoreboard(contest.id)
 
 
 @router.delete("/{slug}/register", status_code=status.HTTP_204_NO_CONTENT)
@@ -411,31 +458,78 @@ def unregister_from_contest(
     if registration is not None:
         db.delete(registration)
         db.commit()
+        invalidate_scoreboard(contest.id)
 
 
-def build_scoreboard(
-    db: Session, contest: Contest, now: datetime, me: User | None
-) -> ScoreboardOut:
-    phase = contest_phase(contest, now)
+# Le classement est identique pour tous les spectateurs (seul `is_me` varie) et ne
+# change que lorsqu'une soumission du contest est créée ou jugée, ou que l'admin
+# modifie le contest. On mémoïse donc le calcul lourd (chargement des soumissions
+# + tri ICPC) par contest, invalidé explicitement à chaque écriture concernée
+# (cf. invalidate_scoreboard) ; le TTL n'est qu'un filet de sécurité contre une
+# voie d'invalidation oubliée ou un champ annexe (display_name), et tombe à l'infini
+# pour un contest terminé (classement figé). La vue propre à chaque utilisateur
+# (is_me) est superposée à la volée sur la ligne du demandeur — négligeable.
+
+
+@dataclass(frozen=True)
+class _BoardData:
+    """Classement prêt à servir, **indépendant du spectateur** : rangs, noms,
+    pénalités et cellules sont identiques pour tous. Tout le travail lourd
+    (chargement, tri ICPC, attribution des rangs, validation des cellules) est
+    fait une seule fois ici puis mémoïsé ; à chaque requête, build_scoreboard ne
+    fait que superposer `is_me` sur la ligne du demandeur. Évite de re-classer et
+    de re-valider 100×20 cellules à chaque sondage de chaque spectateur."""
+
+    board: ScoreboardOut  # rangs calculés, toutes les lignes avec is_me=False
+    me_index: dict[int, int]  # user_id -> index de sa ligne dans board.rows
+
+
+_SCOREBOARD_TTL_S = 10.0
+# Plafond LRU : le cache est borné pour qu'un processus de longue durée voyant
+# défiler beaucoup de contests ne fasse pas croître la mémoire sans fin. Chaque
+# entrée est minuscule (lignes calculées, pas d'ORM attaché) ; quelques dizaines
+# suffisent largement à couvrir les contests réellement consultés en parallèle.
+_SCOREBOARD_CACHE_MAX = 64
+# Valeur = (échéance d'expiration monotone, données). `inf` pour un contest figé.
+_board_cache: OrderedDict[int, tuple[float, _BoardData]] = OrderedDict()
+_board_lock = threading.Lock()
+
+
+def invalidate_scoreboard(contest_id: int) -> None:
+    """À appeler après toute écriture affectant le classement d'un contest."""
+    with _board_lock:
+        _board_cache.pop(contest_id, None)
+
+
+def _compute_board_data(db: Session, contest: Contest) -> _BoardData:
     registrations = db.scalars(
         select(ContestRegistration)
         .options(selectinload(ContestRegistration.user))
         .where(ContestRegistration.contest_id == contest.id)
     ).all()
-    users = {r.user_id: r.user.display_name for r in registrations}
+    names = {r.user_id: r.user.display_name for r in registrations}
     problem_ids = [cp.problem_id for cp in contest.problems]
+    # Seules les colonnes lues par compute_scores : ni le code source ni la sortie
+    # de compilation (potentiellement volumineux) ne sont chargés.
     submissions = db.scalars(
         select(Submission)
-        .options(defer(Submission.source_code), defer(Submission.compile_output))
+        .options(
+            load_only(
+                Submission.user_id,
+                Submission.problem_id,
+                Submission.status,
+                Submission.verdict,
+                Submission.created_at,
+            )
+        )
         .where(Submission.contest_id == contest.id)
     ).all()
-
-    rows = compute_scores(contest.start_at, list(users), problem_ids, submissions)
+    scored = compute_scores(contest.start_at, list(names), problem_ids, list(submissions))
 
     out: list[ScoreRowOut] = []
     rank = 0
     previous: tuple[int, int] | None = None
-    for i, row in enumerate(rows):
+    for i, row in enumerate(scored):
         # Rang partagé à égalité parfaite (résolus, pénalité), comme DOMJudge.
         if (row.solved, row.penalty_min) != previous:
             rank = i + 1
@@ -443,22 +537,62 @@ def build_scoreboard(
         out.append(
             ScoreRowOut(
                 rank=rank,
-                display_name=users[row.user_id],
-                is_me=me is not None and row.user_id == me.id,
+                user_id=row.user_id,
+                display_name=names[row.user_id],
+                is_me=False,  # superposé par spectateur dans build_scoreboard
                 solved=row.solved,
                 penalty_min=row.penalty_min,
+                # CellScore et ScoreCellOut ont les mêmes champs : on copie par
+                # attribut plutôt qu'à la main, pour qu'un champ ajouté d'un côté
+                # ne soit pas silencieusement oublié de l'autre.
                 cells=[
-                    ScoreCellOut(
-                        tries=row.cells[pid].tries,
-                        solved_at_min=row.cells[pid].solved_at_min,
-                        first_blood=row.cells[pid].first_blood,
-                        pending=row.cells[pid].pending,
-                    )
+                    ScoreCellOut.model_validate(row.cells[pid], from_attributes=True)
                     for pid in problem_ids
                 ],
             )
         )
-    return ScoreboardOut(phase=phase, problems=[cp.label for cp in contest.problems], rows=out)
+    board = ScoreboardOut(problems=[cp.label for cp in contest.problems], rows=out)
+    me_index = {row.user_id: i for i, row in enumerate(out)}
+    return _BoardData(board=board, me_index=me_index)
+
+
+def _board_data(db: Session, contest: Contest) -> _BoardData:
+    now = time.monotonic()
+    with _board_lock:
+        cached = _board_cache.get(contest.id)
+        if cached is not None and now < cached[0]:  # cached[0] = échéance d'expiration
+            _board_cache.move_to_end(contest.id)  # rafraîchit l'ordre LRU
+            return cached[1]
+    # Calcul hors verrou : on ne sérialise pas les accès base. Deux requêtes
+    # concurrentes peuvent recalculer la même chose (rare) — sans incidence.
+    data = _compute_board_data(db, contest)
+    # Un contest terminé est figé : son classement ne bougera plus jamais (aucune
+    # soumission ne sera jugée, et l'édition admin est interdite après le début).
+    # On le garde donc sans expiration — inutile de tout recalculer toutes les 10 s
+    # à chaque consultation d'un classement final. En cours, le TTL court n'est
+    # qu'un filet de sécurité derrière l'invalidation explicite.
+    finished = contest_phase(contest, utcnow()) == "finished"
+    expiry = math.inf if finished else time.monotonic() + _SCOREBOARD_TTL_S
+    with _board_lock:
+        _board_cache[contest.id] = (expiry, data)
+        _board_cache.move_to_end(contest.id)
+        while len(_board_cache) > _SCOREBOARD_CACHE_MAX:
+            _board_cache.popitem(last=False)  # évince la plus ancienne entrée
+    return data
+
+
+def build_scoreboard(db: Session, contest: Contest, me: User | None) -> ScoreboardOut:
+    """Vue par spectateur du classement mémoïsé : on ne refait que la superposition
+    `is_me` sur la ligne du demandeur ; tout le reste (rangs, cellules) vient du
+    cache partagé, identique pour tous."""
+    data = _board_data(db, contest)
+    board = data.board
+    idx = data.me_index.get(me.id) if me is not None else None
+    if idx is None:
+        return board  # spectateur sans ligne : la vue partagée convient telle quelle
+    rows = list(board.rows)
+    rows[idx] = rows[idx].model_copy(update={"is_me": True})
+    return ScoreboardOut(problems=board.problems, rows=rows)
 
 
 @router.get("/{slug}/scoreboard")
@@ -471,7 +605,7 @@ def get_scoreboard(
     contest = _load_contest(db, slug)
     if contest_phase(contest, now) == "upcoming":
         raise HTTPException(status.HTTP_409_CONFLICT, "contest_not_started")
-    return build_scoreboard(db, contest, now, user)
+    return build_scoreboard(db, contest, user)
 
 
 # ---------------------------------------------------------------------------
@@ -519,6 +653,31 @@ def _validate_payload(db: Session, payload: ContestPayload) -> list[tuple[int, s
     return [(by_slug[p.slug], p.label) for p in payload.problems]
 
 
+def _reconcile_problems(db: Session, contest: Contest, attached: list[tuple[int, str]]) -> None:
+    """Réécrit les problèmes du contest en **préservant** l'état déjà acquis des
+    problèmes conservés. En particulier `first_blood_announced` : éditer un
+    contest (renommer un label, ajouter un problème) ne doit pas ré-armer une
+    annonce « premier sang » déjà envoyée — sinon le rejudge ou l'annonceur la
+    renverrait.
+
+    On vide puis recrée la collection avec un flush intermédiaire : les anciennes
+    lignes sont supprimées **avant** l'insertion des nouvelles, faute de quoi une
+    simple permutation de labels (A↔B) violerait la contrainte d'unicité
+    (contest_id, label) au sein du même flush.
+    """
+    announced = {cp.problem_id: cp.first_blood_announced for cp in contest.problems}
+    contest.problems.clear()
+    db.flush()
+    contest.problems.extend(
+        ContestProblem(
+            problem_id=pid,
+            label=label,
+            first_blood_announced=announced.get(pid, False),
+        )
+        for pid, label in attached
+    )
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_contest(
     payload: ContestPayload,
@@ -559,8 +718,10 @@ def update_contest(
     contest.description = payload.description
     contest.start_at = payload.start_at
     contest.end_at = payload.end_at
-    contest.problems = [ContestProblem(problem_id=pid, label=label) for pid, label in attached]
+    _reconcile_problems(db, contest, attached)
     db.commit()
+    # Les colonnes (labels, problèmes) du classement ont pu changer.
+    invalidate_scoreboard(contest.id)
     return get_contest(slug, db, admin)
 
 
@@ -575,5 +736,7 @@ def delete_contest(
     # ne supprime pas l'histoire.
     if contest_phase(contest, utcnow()) != "upcoming":
         raise HTTPException(status.HTTP_409_CONFLICT, "contest_started")
+    contest_id = contest.id
     db.delete(contest)
     db.commit()
+    invalidate_scoreboard(contest_id)

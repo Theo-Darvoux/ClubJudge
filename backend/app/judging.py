@@ -10,13 +10,15 @@ import logging
 from datetime import UTC, datetime
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
+from sqlalchemy.orm import joinedload
 
 from app import notify
+from app.contests import invalidate_scoreboard
 from app.db import SessionLocal, as_utc
 from app.judge.base import Judge
 from app.judge.types import Language, TestCase, Verdict
-from app.models import Contest, ContestProblem, Submission, SubmissionStatus
+from app.models import Contest, ContestProblem, Problem, Submission, SubmissionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -74,11 +76,15 @@ class JudgeWorker:
 
     async def _judge_one(self, submission_id: int) -> None:
         with self._session_factory() as db:
-            submission = db.get(Submission, submission_id)
+            submission = db.scalar(
+                select(Submission)
+                .options(
+                    joinedload(Submission.problem).selectinload(Problem.tests),
+                )
+                .where(Submission.id == submission_id)
+            )
             if submission is None or submission.status == SubmissionStatus.DONE:
                 return
-            submission.status = SubmissionStatus.RUNNING
-            db.commit()
             tests = [
                 TestCase(input=t.input, expected_output=t.expected_output)
                 for t in submission.problem.tests
@@ -87,6 +93,9 @@ class JudgeWorker:
             language = Language(submission.language)
             time_limit_s = submission.problem.time_limit_s
             memory_limit_kb = submission.problem.memory_limit_kb
+
+            submission.status = SubmissionStatus.RUNNING
+            db.commit()
 
         attempt = 0
         while True:
@@ -127,6 +136,11 @@ class JudgeWorker:
             submission.failed_test = failed_test
             submission.judged_at = datetime.now(UTC)
             db.commit()
+            contest_id = submission.contest_id
+
+        if contest_id is not None:
+            # Le verdict modifie la cellule (résolu / pénalité / fin d'attente).
+            invalidate_scoreboard(contest_id)
 
         if result.verdict is Verdict.ACCEPTED:
             await self._maybe_first_blood(submission_id)
@@ -142,26 +156,44 @@ class JudgeWorker:
             contest = db.get(Contest, submission.contest_id)
             if contest is None or as_utc(contest.end_at) <= datetime.now(UTC):
                 return
+            cp = db.scalar(
+                select(ContestProblem)
+                .where(
+                    ContestProblem.contest_id == contest.id,
+                    ContestProblem.problem_id == submission.problem_id,
+                )
+                .with_for_update()
+            )
+            if cp is None or cp.first_blood_announced:
+                return
+            # « Premier sang » = le premier AC dans l'ordre total (created_at, id),
+            # exactement l'ordre dont compute_scores tire le ballon du scoreboard
+            # (cf. contests.compute_scores). On annonce donc ssi aucun AC ne le
+            # précède dans cet ordre — y compris à created_at égal, où le plus
+            # petit id gagne. Une comparaison strictement inférieure exclut la
+            # soumission elle-même : pas de filtre `id !=` à maintenir.
             earlier = db.scalar(
                 select(Submission.id)
                 .where(
                     Submission.contest_id == submission.contest_id,
                     Submission.problem_id == submission.problem_id,
                     Submission.verdict == Verdict.ACCEPTED,
-                    Submission.id != submission.id,
-                    Submission.created_at <= submission.created_at,
+                    or_(
+                        Submission.created_at < submission.created_at,
+                        and_(
+                            Submission.created_at == submission.created_at,
+                            Submission.id < submission.id,
+                        ),
+                    ),
                 )
                 .limit(1)
             )
             if earlier is not None:
                 return
-            label = db.scalar(
-                select(ContestProblem.label).where(
-                    ContestProblem.contest_id == contest.id,
-                    ContestProblem.problem_id == submission.problem_id,
-                )
-            )
+            cp.first_blood_announced = True
+            db.commit()
             contest_title = contest.title
             problem_title = submission.problem.title
             member = submission.user.display_name
+            label = cp.label
         await notify.first_blood(contest_title, label or "?", problem_title, member)

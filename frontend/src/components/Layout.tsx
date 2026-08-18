@@ -9,7 +9,7 @@ export function Layout() {
   // Les deux vues de la section Problèmes (arbre /problems, liste /problems/list)
   // sont plein écran : on retire le conteneur centré et les marges du <main>
   // pour leur laisser tout l'espace. Les pages problème (/problems/:slug) non.
-  const bleed = pathname === '/problems' || pathname === '/problems/list';
+  const bleed = pathname === '/problems' || pathname === '/problems/list' || pathname === '/contests';
 
   return (
     <>

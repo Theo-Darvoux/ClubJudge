@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api } from '../api';
+import { api, ApiError } from '../api';
 import type { ProblemDetail } from '../api';
+import { fmtMemoryMo } from '../format';
+import { useMountedRef } from '../hooks';
+import { attemptLabel } from '../problems/attempts';
 import { DifficultyDots } from '../components/badges';
 import { ProblemTabs } from '../components/ProblemTabs';
 import { SolveCelebration } from '../components/SolveCelebration';
@@ -26,33 +29,89 @@ function ProblemView({ slug }: { slug: string }) {
   const { t, lang } = useI18n();
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [hideStatement, setHideStatement] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   const [attempts, setAttempts] = useState<number | null>(null);
+  const [attemptsLoading, setAttemptsLoading] = useState(false);
+  // Incrémenté à CHAQUE AC (y compris une re-résolution plus rapide), pas
+  // seulement à la première : sert à invalider le cache des solutions partagées
+  // pour que la liste et le classement « plus rapide que » reflètent la nouvelle
+  // soumission sans rechargement de page.
+  const [acVersion, setAcVersion] = useState(0);
 
   const toggleStatement = () => {
     setHideStatement((prev) => !prev);
   };
 
-  const handleSolved = (count: number) => {
-    setAttempts(count);
-    setProblem((p) => {
-      // Première résolution (transition non-résolu → résolu) : on fête et on
-      // mémorise le nombre d'essais pour le badge persistant.
-      if (p && !p.solved) {
-        localStorage.setItem(`clubjudge.solvedAttempts.${slug}`, String(count));
-        setCelebrate(true);
-      }
-      return p ? { ...p, solved: true, attempted: true } : p;
-    });
-  };
+  // Miroir de `problem.solved` lisible sans recréer `handleSolved` : ce dernier
+  // ne dépend que de `slug`, donc reste stable quand `problem` change (sinon il
+  // relancerait le minuteur de polling 1 s du Workbench, qui l'a en dépendance).
+  const solvedRef = useRef(false);
+  useEffect(() => {
+    solvedRef.current = problem?.solved ?? false;
+  }, [problem?.solved]);
+
+  const isMountedRef = useMountedRef();
+
+  const handleSolved = useCallback(
+    (count: number, isEstimated: boolean) => {
+      // Tout AC invalide le cache des solutions partagées (avant le garde-fou
+      // « première résolution » ci-dessous, car une re-résolution plus rapide doit
+      // aussi rafraîchir la liste).
+      setAcVersion((v) => v + 1);
+      // Première résolution seulement (transition non-résolu → résolu) : on fête
+      // et on mémorise le nombre d'essais. Un AC ultérieur ne doit pas gonfler le
+      // badge « résolu en N essais ».
+      if (solvedRef.current) return;
+      solvedRef.current = true;
+      // Mises à jour optimistes immédiates (célébration + bascule « résolu »).
+      setAttempts(count); // estimation immédiate (historique courant) pour la célébration
+      setAttemptsLoading(isEstimated);
+      setCelebrate(true);
+      setProblem((p) => (p && !p.solved ? { ...p, solved: true, attempted: true } : p));
+      // Compte fiable, non plafonné par l'historique chargé : on le récupère
+      // côté serveur (endpoint léger) pour que le badge « résolu en N essais »
+      // soit exact même après plus de 50 soumissions.
+      api
+        .solveStats(slug)
+        .then((fresh) => {
+          if (!isMountedRef.current) return;
+          if (fresh.solved_attempts != null) setAttempts(fresh.solved_attempts);
+          setAttemptsLoading(false);
+          setProblem((p) => (p ? { ...p, solved_attempts: fresh.solved_attempts } : p));
+        })
+        .catch(() => {
+          if (isMountedRef.current) {
+            setAttemptsLoading(false);
+          }
+        });
+    },
+    // `isMountedRef` est une ref stable : la lister ne recrée pas `handleSolved`
+    // (qui doit rester stable pour ne pas relancer le polling du Workbench).
+    [slug, isMountedRef],
+  );
 
   useEffect(() => {
+    let active = true;
     api
       .problem(slug)
-      .then(setProblem)
-      .catch(() => setNotFound(true));
-  }, [slug]);
+      .then((data) => {
+        if (active) setProblem(data);
+      })
+      .catch((err) => {
+        if (!active) return;
+        if (err instanceof ApiError && err.status === 404) {
+          setNotFound(true);
+        } else {
+          setLoadError(true);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [slug, retryCount]);
 
   if (notFound) {
     return (
@@ -61,10 +120,35 @@ function ProblemView({ slug }: { slug: string }) {
       </p>
     );
   }
+  if (loadError) {
+    return (
+      <div className="empty-state">
+        <p>{t.problems.load_error}</p>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ marginTop: '0.5rem' }}
+          onClick={() => {
+            setNotFound(false);
+            setLoadError(false);
+            setRetryCount((c) => c + 1);
+          }}
+        >
+          {t.problems.retry}
+        </button>
+      </div>
+    );
+  }
   if (!problem) return <p className="mono-label">{t.problems.loading}</p>;
 
-  const solvedAttempts =
-    attempts ?? (Number(localStorage.getItem(`clubjudge.solvedAttempts.${slug}`)) || 0);
+  // Essais à la première résolution : valeur en direct si on vient de résoudre,
+  // sinon celle calculée par l'API (fiable entre sessions et appareils).
+  const solvedAttempts = attempts ?? problem.solved_attempts ?? 0;
+  // L'en-tête n'affiche le compte que CONFIRMÉ : tant qu'une estimation (historique
+  // plafonné) est en cours de validation par /solve-stats, on s'abstient plutôt que
+  // de montrer un sous-comptage qui sauterait à la valeur exacte une seconde après.
+  // La célébration, elle, gère ce délai avec son propre indicateur de chargement.
+  const showAttempts = problem.solved && !attemptsLoading && solvedAttempts > 0;
 
   return (
     <div className="problem-page">
@@ -100,11 +184,9 @@ function ProblemView({ slug }: { slug: string }) {
               ✓ {t.problems.solved}
             </span>
           )}
-          {problem.solved && solvedAttempts > 0 && (
+          {showAttempts && (
             <span className="attempt-chip" title={t.problem.attempt_badge_title}>
-              {solvedAttempts === 1
-                ? t.problem.first_try
-                : t.problem.solved_in_tries(solvedAttempts)}
+              {attemptLabel(t, solvedAttempts)}
             </span>
           )}
         </h1>
@@ -122,9 +204,10 @@ function ProblemView({ slug }: { slug: string }) {
           ))}
           <span className="limits">
             {t.problem.time_limit} {problem.time_limit_s} s · {t.problem.memory_limit}{' '}
-            {Math.round(problem.memory_limit_kb / 1024)} Mo
+            {fmtMemoryMo(problem.memory_limit_kb, lang)}
           </span>
           <button
+            type="button"
             className="btn-toggle-statement"
             onClick={toggleStatement}
             aria-label={hideStatement ? t.problem.show_statement : t.problem.hide_statement}
@@ -164,7 +247,9 @@ function ProblemView({ slug }: { slug: string }) {
       </header>
 
       <div className={`problem-columns ${hideStatement ? 'problem-columns--single' : ''}`}>
-        {!hideStatement && <ProblemTabs problem={problem} slug={slug} />}
+        <div style={{ display: hideStatement ? 'none' : 'block' }}>
+          <ProblemTabs problem={problem} slug={slug} acVersion={acVersion} />
+        </div>
         <Workbench slug={slug} samples={problem.samples} onSolved={handleSolved} />
       </div>
 
@@ -172,6 +257,7 @@ function ProblemView({ slug }: { slug: string }) {
         <SolveCelebration
           problem={problem}
           attempts={attempts}
+          loading={attemptsLoading}
           onClose={() => setCelebrate(false)}
         />
       )}

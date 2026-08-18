@@ -20,6 +20,14 @@ class Verdict(StrEnum):
     INTERNAL_ERROR = "IE"
 
 
+# Verdicts qui ne comptent pas comme une vraie tentative jugée : CE n'a jamais été
+# exécuté, IE est un incident côté juge (faute du serveur, pas du membre). Source
+# unique partagée par la pénalité du classement (contests) et le badge « résolu en
+# N essais » (progress), pour que les deux définitions d'un « essai » ne puissent
+# pas diverger.
+NON_ATTEMPT_VERDICTS = frozenset({Verdict.COMPILATION_ERROR, Verdict.INTERNAL_ERROR})
+
+
 @dataclass(frozen=True)
 class TestCase:
     input: str

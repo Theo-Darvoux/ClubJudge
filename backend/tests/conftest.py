@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app import submissions
+from app import contests, submissions
 from app.db import Base, get_db
 from app.judge.base import Judge
 from app.judge.types import (
@@ -114,6 +114,7 @@ def client(session_factory, stub_worker, fake_judge):
     app.dependency_overrides[get_worker] = lambda: stub_worker
     app.dependency_overrides[get_judge] = lambda: fake_judge
     submissions._last_run_at.clear()  # cooldown des runs, sinon il fuit entre tests
+    contests._board_cache.clear()  # cache scoreboard : les ids de contest se réutilisent
     # Pas de `with` : on évite le lifespan (worker réel) en tests unitaires.
     yield TestClient(app)
     app.dependency_overrides.clear()
@@ -137,10 +138,12 @@ def problem(db) -> Problem:
     return problem
 
 
-def register(client: TestClient, email: str = "alice@example.org") -> dict:
+def register(client: TestClient, email: str = "alice@example.org", display_name: str | None = None) -> dict:
+    if display_name is None:
+        display_name = email.split("@")[0].capitalize()
     resp = client.post(
         "/api/auth/register",
-        json={"email": email, "password": "correct-horse", "display_name": "Alice"},
+        json={"email": email, "password": "correct-horse", "display_name": display_name},
     )
     assert resp.status_code == 201, resp.text
     return resp.json()

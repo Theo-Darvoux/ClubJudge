@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import type { ProblemDetail } from '../api';
@@ -14,6 +14,13 @@ export function TpBlock({ slug }: { slug: string }) {
   const { t, lang } = useI18n();
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+
+  // Stable d'un rendu à l'autre : le Workbench a `onSolved` en dépendance de son
+  // minuteur de polling (1 s). Une closure recréée à chaque rendu le relancerait
+  // sans cesse (cf. le même soin pris dans ProblemPage.handleSolved).
+  const handleSolved = useCallback(() => {
+    setProblem((p) => (p ? { ...p, solved: true } : p));
+  }, []);
 
   useEffect(() => {
     api
@@ -70,7 +77,7 @@ export function TpBlock({ slug }: { slug: string }) {
         slug={problem.slug}
         height="300px"
         showHistory={false}
-        onSolved={() => setProblem((p) => (p ? { ...p, solved: true } : p))}
+        onSolved={handleSolved}
       />
     </aside>
   );

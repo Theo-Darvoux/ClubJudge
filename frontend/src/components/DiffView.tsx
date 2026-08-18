@@ -1,19 +1,25 @@
 import { useMemo } from 'react';
-import { lineDiff } from './diff';
+import { lineDiff, splitTrailingWs } from './diff';
 
 /* Affiche le diff « attendu vs obtenu » : la tolérance d'égalité copie celle du
    juge, mais on rend le texte brut avec les espaces de fin visibles — un WA dû à
    un simple espace ou retour à la ligne devient ainsi lisible. */
 
 function LineText({ text }: { text: string }) {
-  const match = text.match(/^(.*?)([ \t]+)$/);
-  if (!match) return <>{text === '' ? ' ' : text}</>;
-  const trailing = match[2].replace(/ /g, '·').replace(/\t/g, '→');
+  // Aligné sur la tolérance du diff (cf. splitTrailingWs) : on rend visible tout
+  // espace de fin, y compris un retour chariot \r isolé qui causerait un WA.
+  const [body, trailing] = splitTrailingWs(text);
+  if (!trailing) return <>{text === '' ? ' ' : text}</>;
+  const marks = trailing
+    .replace(/ /g, '·')
+    .replace(/\t/g, '→')
+    .replace(/\r/g, '␍')
+    .replace(/[\f\v]/g, '▯');
   return (
     <>
-      {match[1]}
+      {body}
       <span className="ws-mark" title="espaces de fin">
-        {trailing}
+        {marks}
       </span>
     </>
   );

@@ -528,6 +528,10 @@ select {
   background: var(--lav-08);
 }
 
+.problem-table tbody tr:hover td:first-child {
+  box-shadow: inset 3px 0 0 var(--lav);
+}
+
 .col-status {
   width: 3rem;
 }
@@ -642,7 +646,8 @@ select {
 /* Même toile immersive que l'arbre : fond fixe sous la navigation, dégradé
    lavande, défilement interne. L'en-tête flottant (titre + bascule) se
    superpose au même endroit que dans l'arbre. */
-.problems-fullscreen {
+.problems-fullscreen,
+.contests-fullscreen {
   position: fixed;
   inset: var(--nav-h) 0 0 0;
   overflow-y: auto;
@@ -666,7 +671,8 @@ select {
     0 0;
 }
 
-.problems-scroll {
+.problems-scroll,
+.contests-scroll {
   width: min(var(--container), 100% - 3rem);
   margin-inline: auto;
   /* dégage la hauteur de l'en-tête flottant ancré en haut-gauche */
@@ -1850,6 +1856,12 @@ select {
   margin: 0;
 }
 
+.run-truncated {
+  margin: 0.25rem 0 0;
+  color: var(--verdict-wa, var(--ink-dim));
+  font-size: 0.78rem;
+}
+
 .run-case {
   border: 1px solid var(--line-soft);
   border-left: 2px solid var(--line);
@@ -2305,6 +2317,7 @@ select {
    padding-box, cadre en border-box) puis découpé par le clip-path, donc même
    les arêtes diagonales gardent leur trait fin — pas de wrapper nécessaire. */
 .problems-head.floating,
+.contests-head.floating,
 .skill-hud.floating,
 .skill-panel.floating {
   position: absolute;
@@ -2337,7 +2350,8 @@ select {
 /* L'en-tête est ancré au viewport (position: fixed) et non au conteneur de la
    vue : il occupe ainsi le même point exact dans l'arbre et dans la liste, donc
    la bascule Arbre/Liste reste rigoureusement immobile entre les deux vues. */
-.problems-head.floating {
+.problems-head.floating,
+.contests-head.floating {
   position: fixed;
   top: calc(var(--nav-h) + 1.1rem);
   left: 1.1rem;
@@ -2350,13 +2364,15 @@ select {
 /* Largeur réservée pour le bloc titres : l'overline varie d'une vue à l'autre
    (« ARBRE DE COMPÉTENCES » vs « 11 PROBLÈMES »). En figeant la largeur de la
    colonne, la bascule Arbre/Liste qui la suit ne se décale plus d'un pixel. */
-.problems-head-titles {
+.problems-head-titles,
+.contests-head-titles {
   display: grid;
   gap: 0.1rem;
   min-width: 13rem;
 }
 
-.problems-head.floating h1 {
+.problems-head.floating h1,
+.contests-head.floating h1 {
   font-size: 1.25rem;
   margin: 0.1rem 0 0;
 }
@@ -2681,7 +2697,8 @@ select {
     display: none;
   }
 
-  .problems-head.floating {
+  .problems-head.floating,
+  .contests-head.floating {
     top: calc(var(--nav-h) + 0.7rem);
     left: 0.7rem;
     right: 0.7rem;
@@ -2692,11 +2709,13 @@ select {
     justify-content: space-between;
   }
 
-  .problems-head-titles {
+  .problems-head-titles,
+  .contests-head-titles {
     min-width: 0;
   }
 
-  .problems-head.floating h1 {
+  .problems-head.floating h1,
+  .contests-head.floating h1 {
     font-size: 1.05rem;
   }
 
@@ -2732,52 +2751,176 @@ select {
 }
 
 .contest-card {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr);
+  column-gap: 0.8rem;
+  row-gap: 0.5rem;
   align-items: center;
-  gap: 1.2rem;
-  padding: 1.1rem 1.4rem;
-  text-decoration: none;
+  padding: 1rem 1.3rem;
+  color: inherit;
   background: var(--bg-raised);
   box-shadow: inset 0 0 0 1px var(--line-soft);
   clip-path: polygon(
     0 0,
-    calc(100% - var(--notch)) 0,
-    100% var(--notch),
+    calc(100% - var(--notch-sm)) 0,
+    100% var(--notch-sm),
     100% 100%,
-    var(--notch) 100%,
-    0 calc(100% - var(--notch))
+    var(--notch-sm) 100%,
+    0 calc(100% - var(--notch-sm))
   );
-  transition: box-shadow 0.25s var(--ease-out), transform 0.25s var(--ease-out);
+  transition: box-shadow 0.22s var(--ease-out), background 0.22s var(--ease-out),
+    transform 0.22s var(--ease-out), filter 0.22s var(--ease-out);
+  text-decoration: none;
 }
 
 .contest-card:hover {
+  background: var(--lav-08);
   box-shadow: inset 0 0 0 1px var(--lav-25);
-  transform: translateY(-2px);
+  transform: translateX(4px);
+  filter: drop-shadow(0 4px 12px rgba(220, 183, 255, 0.08));
 }
 
-.contest-card-main {
-  display: grid;
-  gap: 0.3rem;
+.contest-card.is-running {
+  box-shadow: inset 3px 0 0 var(--lav), inset 0 0 0 1px var(--lav-25);
+  background: rgba(220, 183, 255, 0.04);
 }
 
-.contest-card-main h2 {
-  font-size: 1.25rem;
+.contest-card.is-running:hover {
+  box-shadow: inset 3px 0 0 var(--lav), inset 0 0 0 1px var(--lav);
+  background: var(--lav-08);
+  transform: translateX(4px);
+  filter: drop-shadow(0 4px 12px rgba(220, 183, 255, 0.14));
 }
 
-.contest-card-meta {
+.contest-card.is-registered {
+  box-shadow: inset 3px 0 0 var(--verdict-ac), inset 0 0 0 1px rgba(127, 224, 167, 0.14);
+  background: rgba(127, 224, 167, 0.015);
+}
+
+.contest-card.is-registered:hover {
+  box-shadow: inset 3px 0 0 var(--verdict-ac), inset 0 0 0 1px rgba(127, 224, 167, 0.35);
+  background: rgba(127, 224, 167, 0.05);
+  transform: translateX(4px);
+  filter: drop-shadow(0 4px 12px rgba(127, 224, 167, 0.08));
+}
+
+.ccard-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.ccard-rail {
+  position: relative;
+  z-index: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding-top: 0.1rem;
+}
+
+.ccard-index {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  color: var(--ink-dim);
+}
+
+.contest-status-mark {
+  display: inline-block;
+  width: 1.3rem;
+  text-align: center;
+  font-weight: 700;
+}
+
+.contest-status-mark.is-registered {
+  color: var(--verdict-ac);
+}
+
+.contest-status-mark.is-running {
+  color: var(--lav);
+  animation: live-pulse-marker 1.6s ease-in-out infinite;
+}
+
+.contest-status-mark.is-upcoming {
   color: var(--ink-soft);
-  font-size: 0.9rem;
 }
 
-.contest-card-side {
+.contest-status-mark.is-finished {
+  color: var(--ink-dim);
+}
+
+@keyframes live-pulse-marker {
+  0%, 100% { opacity: 1; text-shadow: 0 0 4px var(--lav-glow); }
+  50% { opacity: 0.4; text-shadow: none; }
+}
+
+.ccard-top {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  flex-shrink: 0;
+  gap: 0.7rem;
+  min-width: 0;
 }
 
-.contest-card-cta {
+.ccard-title {
+  position: relative;
+  z-index: 2;
+  width: fit-content;
+  font-weight: 500;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  font-size: 1.15rem;
+  transition: color 0.22s var(--ease-out);
+}
+
+.contest-card:hover .ccard-title {
+  color: var(--lav);
+}
+
+.ccard-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 2;
+}
+
+.ccard-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  min-width: 0;
+  position: relative;
+  z-index: 2;
+  /* Les chips et l'indicateur ne sont pas interactifs : on laisse le clic
+     traverser jusqu'à la couverture (.ccard-cover) pour ouvrir le contest. */
+  pointer-events: none;
+}
+
+.ccard-flag {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+.flag-finished {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.flag-running-registered {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--lav);
 }
 
@@ -2821,6 +2964,33 @@ select {
 
 /* ---- Page contest ------------------------------------------------------- */
 
+.contest-page {
+  position: relative;
+  background:
+    radial-gradient(100% 60% at 50% -10%, var(--lav-05), transparent 60%),
+    var(--bg-raised);
+  padding: 1.8rem 2.2rem;
+  border: 1px solid var(--line-soft);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--notch)) 0,
+    100% var(--notch),
+    100% 100%,
+    var(--notch) 100%,
+    0 calc(100% - var(--notch))
+  );
+  box-shadow:
+    0 8px 32px rgba(8, 8, 13, 0.4),
+    inset 0 0 1px rgba(220, 183, 255, 0.1);
+  margin-bottom: 3rem;
+}
+
+@media (max-width: 680px) {
+  .contest-page {
+    padding: 1.2rem 1.4rem;
+  }
+}
+
 .contest-head {
   display: flex;
   justify-content: space-between;
@@ -2863,10 +3033,11 @@ select {
 
 .contest-countdown strong {
   font-family: var(--font-mono);
-  font-size: 1.6rem;
-  font-weight: 500;
+  font-size: 1.8rem;
+  font-weight: 600;
   color: var(--lav);
   letter-spacing: 0.04em;
+  text-shadow: 0 0 10px rgba(220, 183, 255, 0.4);
 }
 
 .contest-reg-state {
@@ -2877,6 +3048,14 @@ select {
 
 .contest-finished-note {
   color: var(--ink-dim);
+}
+
+/* Erreur d'action (inscription/désinscription) : alignée à droite sous le bloc
+ *  d'inscription, discrète mais visible. */
+.contest-action-error {
+  color: var(--verdict-wa);
+  font-size: 0.85rem;
+  text-align: right;
 }
 
 .contest-description {
@@ -2896,6 +3075,16 @@ select {
   margin-bottom: 2.6rem;
 }
 
+/* Onglets Problèmes / Classement (réutilise .status-segmented / .seg-btn). */
+.contest-view-toggle {
+  margin-bottom: 1.4rem;
+}
+
+/* Note « actualisé toutes les 15 s » quand l'onglet remplace le titre de section. */
+.contest-scoreboard-refresh {
+  margin: 0 0 0.8rem;
+}
+
 .problem-table .col-label {
   width: 3rem;
 }
@@ -2908,9 +3097,50 @@ select {
   text-transform: none;
 }
 
+/* Outils au-dessus du classement : recherche d'équipe (dépliée seulement quand
+ *  il y a du monde) et compteur de résultats filtrés. */
+.scoreboard-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 0.7rem;
+}
+
+.scoreboard-filter {
+  flex: 0 1 16rem;
+  padding: 0.4rem 0.7rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.scoreboard-filter:focus {
+  outline: none;
+  border-color: var(--lav-25);
+}
+
+.scoreboard-count {
+  color: var(--ink-dim);
+}
+
+/* Cadre défilant : un seul conteneur scrolle les deux axes, ce qui permet à la
+ *  fois l'en-tête collant (vertical) et le bloc identité gelé (horizontal) —
+ *  indispensable à 20 problèmes × 100 équipes. */
+.scoreboard-scroll {
+  max-height: min(70vh, 44rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+}
+
 .scoreboard-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.95rem;
 }
 
@@ -2931,19 +3161,116 @@ select {
   border-bottom: 1px solid var(--line-soft);
 }
 
+/* Fenêtrage du classement (cf. useVirtualRows) : seules les lignes visibles sont
+ *  montées. Le calcul de fenêtre suppose des lignes de hauteur fixe. Cette hauteur
+ *  a une source unique : la constante ROW_H (ContestPage), injectée via la variable
+ *  `--row-h` sur `.scoreboard-scroll` — JS et CSS ne peuvent plus diverger. La
+ *  valeur couvre le cas le plus haut (cellule à deux lignes : « +N » sur le temps).
+ *  Repli à 54px si la variable manque (rendu hors React). */
+.scoreboard-table tbody tr {
+  height: var(--row-h, 54px);
+  transition: background 0.15s var(--ease-out);
+}
+
+.scoreboard-table tbody tr:hover td {
+  background: var(--lav-08) !important;
+}
+/* Borne dure : les cellules ne dépassent jamais la hauteur de ligne (sinon le
+ *  contenu — nom long, ballons — ferait grandir la ligne et dériver les cales du
+ *  fenêtrage). Le contenu interne gère déjà son propre débordement (ellipsis sur
+ *  le nom, ballons en `nowrap`, cellule de score sur deux lignes courtes). */
+.scoreboard-table tbody td {
+  vertical-align: middle;
+  height: var(--row-h, 54px);
+  max-height: var(--row-h, 54px);
+  overflow: hidden;
+}
+/* Cales haut/bas qui réservent la place des lignes non montées : pas de bordure
+ *  ni de remplissage, leur seule hauteur compte. */
+.scoreboard-table tr.vrow-pad td {
+  padding: 0;
+  border: 0;
+}
+
+/* En-tête collant : reste au-dessus des 100 lignes pendant le défilement. */
+.scoreboard-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg);
+}
+
+/* Largeurs fixes du bloc identité (nécessaires pour caler les décalages gelés). */
+.scoreboard-table .col-rank {
+  width: 3.4rem;
+}
+.scoreboard-table .col-member {
+  width: 13rem;
+}
+.scoreboard-table .col-solved {
+  width: 3.6rem;
+}
+.scoreboard-table .col-penalty {
+  width: 4.4rem;
+}
+
+/* Bloc identité gelé à gauche : rang / membre / résolus / pénalité restent lus
+ *  pendant que la grille des problèmes défile horizontalement. Fond opaque pour
+ *  masquer les cellules qui glissent dessous. */
 .scoreboard-table .col-rank,
-.scoreboard-table .col-num {
-  width: 4.5rem;
+.scoreboard-table .col-member,
+.scoreboard-table .col-solved,
+.scoreboard-table .col-penalty {
+  position: sticky;
+  z-index: 1;
+  background: var(--bg);
+}
+.scoreboard-table .col-rank {
+  left: 0;
+}
+.scoreboard-table .col-member {
+  left: 3.4rem;
+}
+.scoreboard-table .col-solved {
+  left: 16.4rem;
+}
+.scoreboard-table .col-penalty {
+  left: 20rem;
+  box-shadow: inset -1px 0 0 var(--line-soft);
+}
+
+/* Coins gelés de l'en-tête : collants sur les deux axes, donc au-dessus de tout. */
+.scoreboard-table thead .col-rank,
+.scoreboard-table thead .col-member,
+.scoreboard-table thead .col-solved,
+.scoreboard-table thead .col-penalty {
+  z-index: 4;
 }
 
 .scoreboard-table th.col-problem,
 .scoreboard-table .score-cell {
   text-align: center;
-  width: 4.2rem;
+  width: 2.9rem;
+  padding-left: 0.3rem;
+  padding-right: 0.3rem;
 }
 
 .scoreboard-table tr.is-me td {
   background: var(--lav-08);
+}
+
+/* La ligne « moi » garde un fond opaque sur ses cellules gelées. */
+.scoreboard-table tr.is-me .col-rank,
+.scoreboard-table tr.is-me .col-member,
+.scoreboard-table tr.is-me .col-solved,
+.scoreboard-table tr.is-me .col-penalty {
+  background: color-mix(in srgb, var(--lav) 8%, var(--bg));
+}
+
+.scoreboard-no-match td {
+  padding: 1.4rem;
+  text-align: center;
+  color: var(--ink-dim);
 }
 
 .me-chip {
@@ -2967,17 +3294,33 @@ select {
   color: var(--ink-dim);
 }
 
+.score-cell.is-solved {
+  background: rgba(127, 224, 167, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(127, 224, 167, 0.08);
+}
+
 .score-cell.is-solved .score-cell-main {
   color: var(--verdict-ac);
 }
 
+/* Premier sang : la case entière est dorée (plus de glyphe ✦ dans la grille). */
 .score-cell.is-first-blood {
-  background: color-mix(in srgb, var(--lav) 10%, transparent);
+  background: var(--gold-08);
+  box-shadow: inset 0 0 0 1px var(--gold-25) !important;
+}
+
+.score-cell.is-first-blood .score-cell-main {
+  color: var(--gold);
 }
 
 .first-blood-mark {
-  color: var(--lav);
+  color: var(--gold);
   margin-right: 0.15rem;
+}
+
+.score-cell.is-failed {
+  background: rgba(255, 127, 127, 0.02);
+  box-shadow: inset 0 0 0 1px rgba(255, 127, 127, 0.05);
 }
 
 .score-cell.is-failed .score-cell-main {
@@ -2997,6 +3340,269 @@ select {
   text-transform: none;
 }
 
+/* Ligne du scoreboard qui vient de gagner un résolu : flash vert bref. */
+.scoreboard-table tr.is-gain td {
+  animation: score-gain 1.6s var(--ease-out);
+}
+
+@keyframes score-gain {
+  0% { background: color-mix(in srgb, var(--verdict-ac) 38%, transparent); }
+  100% { background: transparent; }
+}
+
+/* La ligne « moi » garde son fond lavande même pendant le flash. */
+.scoreboard-table tr.is-me.is-gain td {
+  animation-name: score-gain-me;
+}
+
+@keyframes score-gain-me {
+  0% { background: color-mix(in srgb, var(--verdict-ac) 38%, transparent); }
+  100% { background: var(--lav-08); }
+}
+
+/* Pastille de déplacement de rang depuis le dernier rafraîchissement. */
+.rank-delta {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  animation: rank-delta-in 0.3s var(--ease-out);
+}
+
+.rank-delta.is-up {
+  color: var(--verdict-ac);
+}
+
+.rank-delta.is-down {
+  color: var(--verdict-wa);
+}
+
+@keyframes rank-delta-in {
+  from { opacity: 0; transform: translateY(0.3rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Toasts « premier sang » empilés en bas à droite. */
+.scoreboard-toasts {
+  position: fixed;
+  right: 1.4rem;
+  bottom: 1.4rem;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  pointer-events: none;
+}
+
+.scoreboard-toast {
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 22rem;
+  padding: 0.7rem 1rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--lav-25), 0 0 18px rgba(220, 183, 255, 0.18);
+  animation: toast-in 0.32s var(--ease-out);
+}
+
+.scoreboard-toast .first-blood-mark {
+  font-size: 1.05rem;
+  margin-right: 0;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(1.5rem); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scoreboard-table tr.is-gain td,
+  .rank-delta,
+  .scoreboard-toast {
+    animation: none;
+  }
+}
+
+/* ---- Ballons ICPC ------------------------------------------------------- */
+
+.balloon {
+  display: inline-block;
+  vertical-align: -0.3em;
+}
+
+/* Nom d'équipe + ses ballons gagnés, sur une seule ligne dans la colonne gelée :
+ *  le nom s'ellipse, la pastille « moi » et les ballons restent visibles. */
+.team-name {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.team-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.team-balloons {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.05rem;
+  flex-shrink: 0;
+}
+
+/* Surplus de ballons au-delà du plafond : « +14 », compact. */
+.balloon-more {
+  align-self: center;
+  font-size: 0.66rem;
+  color: var(--ink-dim);
+}
+
+/* En-tête de colonne : petit ballon de légende, en ligne avec le label, pour ne
+ *  pas gonfler la hauteur de l'en-tête. */
+.col-problem-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.col-problem-head .balloon {
+  width: 8px;
+  height: 14px;
+  vertical-align: middle;
+}
+
+.label-with-balloon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.col-resources {
+  text-align: right;
+  white-space: nowrap;
+  /* largeur juste suffisante pour « Éditorial → » : la cellule (et donc sa
+     zone cliquable) ne déborde plus sur le reste de la ligne */
+  width: 1%;
+  /* contexte d'ancrage pour l'overlay cliquable du lien Éditorial ci-dessous */
+  position: relative;
+}
+
+.editorial-link {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--lav);
+}
+
+.editorial-link::after {
+  /* étend la zone cliquable à toute la cellule Éditorial (et non au seul
+     texte) ; le z-index la place au-dessus de l'overlay de la ligne
+     (.problem-link::after), sinon le clic mène à l'énoncé */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.editorial-link:hover {
+  text-decoration: underline;
+}
+
+.resources-empty {
+  color: var(--ink-dim);
+}
+
+/* ---- Salle d'attente + lancement ---------------------------------------- */
+
+.contest-lobby {
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+  text-align: center;
+  padding: 2.6rem 1.5rem;
+  margin-bottom: 1.6rem;
+  border: 1px solid var(--line);
+  background: radial-gradient(120% 90% at 50% 0%, var(--lav-08), transparent 70%);
+}
+
+.contest-lobby-balloons {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.55rem;
+  margin-bottom: 0.4rem;
+  animation: balloon-bob 3s ease-in-out infinite;
+}
+
+.contest-lobby-balloons .balloon {
+  width: 22px;
+  height: 40px;
+}
+
+.contest-lobby-title {
+  font-size: 1.4rem;
+}
+
+.contest-lobby-countdown {
+  font-family: var(--font-mono);
+  font-size: clamp(2rem, 6vw, 2.6rem);
+  font-weight: 500;
+  color: var(--lav);
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 12px rgba(220, 183, 255, 0.4);
+}
+
+.contest-lobby-hint {
+  max-width: 28rem;
+  color: var(--ink-soft);
+}
+
+.contest-start-flash {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.85rem 1.15rem;
+  margin-bottom: 1.6rem;
+  font-weight: 500;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--verdict-ac) 14%, var(--bg-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--verdict-ac) 40%, transparent);
+  animation: start-flash-in 0.4s var(--ease-out);
+}
+
+.contest-start-balloons {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.2rem;
+  animation: balloon-bob 2.4s ease-in-out infinite;
+}
+
+@keyframes balloon-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.3rem); }
+}
+
+@keyframes start-flash-in {
+  from { opacity: 0; transform: translateY(-0.5rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contest-lobby-balloons,
+  .contest-start-balloons,
+  .contest-start-flash {
+    animation: none;
+  }
+}
+
 /* ---- Bannière contest (page problème) ----------------------------------- */
 
 .contest-banner {
@@ -3004,9 +3610,9 @@ select {
   align-items: center;
   gap: 0.9rem;
   flex-wrap: wrap;
-  padding: 0.7rem 1.1rem;
-  margin-bottom: 1.4rem;
-  background: var(--lav-08);
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1.6rem;
+  background: linear-gradient(90deg, rgba(220, 183, 255, 0.06), rgba(220, 183, 255, 0.01));
   box-shadow: inset 0 0 0 1px var(--lav-14);
   clip-path: polygon(
     0 0,
@@ -3016,6 +3622,18 @@ select {
     var(--notch-sm) 100%,
     0 calc(100% - var(--notch-sm))
   );
+  position: relative;
+  overflow: hidden;
+}
+
+.contest-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--lav);
 }
 
 .contest-banner-text {
@@ -3182,9 +3800,23 @@ select {
     grid-template-columns: 1fr;
   }
 
-  .scoreboard-table {
-    display: block;
-    overflow-x: auto;
+  /* Sur petit écran, l'espace gelé doit rester contenu : on ne fige que rang +
+   *  membre, résolus et pénalité défilent avec la grille. Nom plus court. */
+  .scoreboard-table .col-solved,
+  .scoreboard-table .col-penalty {
+    position: static;
+  }
+
+  .scoreboard-table .col-member {
+    width: 9.5rem;
+  }
+
+  .scoreboard-table .col-penalty {
+    box-shadow: none;
+  }
+
+  .scoreboard-table .col-member {
+    box-shadow: inset -1px 0 0 var(--line-soft);
   }
 }
 
@@ -3636,6 +4268,14 @@ select {
   background: var(--lav-08);
 }
 
+/* Confirmation de copie : l'icône passe au vert « validé » un court instant. */
+.tool-btn.is-success,
+.tool-btn.is-success:hover {
+  color: var(--verdict-ac);
+  border-color: var(--verdict-ac);
+  background: transparent;
+}
+
 .tool-btn svg {
   display: block;
 }
@@ -3913,6 +4553,24 @@ select {
   color: var(--verdict-ac);
   background: color-mix(in srgb, var(--verdict-ac) 12%, transparent);
   border-color: color-mix(in srgb, var(--verdict-ac) 35%, transparent);
+}
+
+.attempt-badge.is-loading {
+  width: 140px;
+  height: 1.58rem;
+  background: linear-gradient(90deg, var(--lav-08) 25%, var(--lav-14) 50%, var(--lav-08) 75%);
+  background-size: 200% 100%;
+  animation: loading-shimmer 1.5s infinite linear;
+  border-color: var(--lav-14);
+}
+
+@keyframes loading-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .celebrate-next {

@@ -181,9 +181,25 @@ class WsLspClient {
     }
   }
 
+  private closeSocket(): void {
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.onmessage = null;
+      try {
+        this.ws.close();
+      } catch {
+        // ignore
+      }
+      this.ws = null;
+    }
+  }
+
   /** Ouvre une socket et fait le handshake LSP (initialize + initialized), puis
       ré-ouvre les documents connus (utile à la reconnexion). */
   private openAndHandshake(): Promise<void> {
+    this.closeSocket();
     return new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(this.url);
       this.ws = ws;
@@ -333,7 +349,17 @@ class WsLspClient {
 
   private getDoc(model: editor.ITextModel): DocState {
     const existing = this.docsByModel.get(model);
-    if (existing) return existing;
+    if (existing) {
+      const { languageId } = this.config.docInfo(model);
+      if (existing.languageId === languageId) {
+        return existing;
+      }
+      // Language changed (e.g. cpp -> c): close the old document on the server and discard its state.
+      this.notify('textDocument/didClose', { textDocument: { uri: existing.uri } });
+      this.docsByModel.delete(model);
+      this.docsByUri.delete(existing.uri);
+      existing.willDispose.dispose();
+    }
     const { ext, languageId } = this.config.docInfo(model);
     const uri = `file:///main-${++this.docCounter}.${ext}`;
     const doc: DocState = {
@@ -528,12 +554,12 @@ class WsLspClient {
   // ---- Diagnostics (par éditeur) ------------------------------------------
 
   setupDiagnostics(editorInstance: editor.IStandaloneCodeEditor): void {
+    this.stopDiagnostics(editorInstance);
     const model = editorInstance.getModel();
     if (!model) return;
     this.diagModels.add(model);
     this.getDoc(model); // ouvre le document si besoin
     this.refreshDiagnostics(model); // première analyse
-    this.diagSubs.get(editorInstance)?.content.dispose();
     const sub = {
       content: editorInstance.onDidChangeModelContent(() => {
         const m = editorInstance.getModel();
@@ -624,10 +650,7 @@ class WsLspClient {
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
     this.failPending(new Error(`${this.config.name}: client détruit`));
-    if (this.ws) {
-      this.ws.onclose = null;
-      this.ws.close();
-    }
+    this.closeSocket();
   }
 }
 

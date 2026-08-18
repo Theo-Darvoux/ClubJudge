@@ -1,6 +1,7 @@
 """Phase 2 : compétitions ICPC — scoring, visibilité, inscriptions, admin."""
 
 from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
 
 from sqlalchemy import select
 
@@ -277,6 +278,33 @@ def test_no_unregister_after_start_no_register_after_end(client, db, problem):
     assert client.post("/api/contests/fini/register").status_code == 409
 
 
+def test_finished_contest_surfaces_editorial(client, db, problem):
+    register(client)
+    make_contest(db, problem, start_in_min=-120, end_in_min=-60)  # terminé
+
+    detail = client.get("/api/contests/contest-test").json()
+    assert detail["phase"] == "finished"
+    # Sans éditorial : exposé mais faux.
+    assert detail["problems"][0]["has_editorial"] is False
+
+    problem.editorial_fr = "Trier puis deux pointeurs."
+    db.commit()
+    detail = client.get("/api/contests/contest-test").json()
+    assert detail["problems"][0]["has_editorial"] is True
+
+
+def test_running_contest_hides_editorial_flag(client, db, problem):
+    register(client)
+    contest = make_contest(db, problem, start_in_min=-30, end_in_min=30)
+    register_to(db, contest, "alice@example.org")
+    problem.editorial_fr = "Trier puis deux pointeurs."
+    db.commit()
+
+    # Inscrit pendant la fenêtre : énoncés visibles, mais éditorial fermé (ICPC).
+    detail = client.get("/api/contests/contest-test").json()
+    assert detail["problems"][0]["has_editorial"] is False
+
+
 def test_problem_list_hidden_from_unregistered_detail(client, db, problem):
     register(client)
     make_contest(db, problem, start_in_min=-30, end_in_min=30)
@@ -438,3 +466,178 @@ def test_rejudge_requires_admin(client, db, problem):
     register(client)
     assert client.post(f"/api/admin/problems/{problem.slug}/rejudge").status_code == 403
     assert client.post("/api/admin/submissions/1/rejudge").status_code == 403
+
+
+def _second_problem(db) -> Problem:
+    p = Problem(
+        slug="trois-sommes",
+        title="Trois sommes",
+        category="bases",
+        difficulty=2,
+        statement_fr="Calculez $a+b+c$.",
+    )
+    db.add(p)
+    db.commit()
+    return p
+
+
+def test_update_contest_preserves_first_blood_announced(client, db, problem):
+    """Éditer un contest ne doit pas ré-armer une annonce « premier sang » déjà
+    envoyée pour un problème conservé ; un problème ajouté part bien à zéro."""
+    make_admin(client, db)
+    second = _second_problem(db)
+    contest = make_contest(db, problem, start_in_min=-30, end_in_min=30)
+    contest.problems[0].first_blood_announced = True
+    db.commit()
+
+    resp = client.put(
+        "/api/contests/contest-test",
+        json={
+            "slug": "contest-test",
+            "title": "Titre modifié",
+            "start_at": "2026-07-01T18:00:00+00:00",
+            "end_at": "2026-07-01T21:00:00+00:00",
+            "problems": [
+                {"slug": problem.slug, "label": "A"},
+                {"slug": second.slug, "label": "B"},
+            ],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    db.expire_all()
+    contest = db.scalar(select(Contest).where(Contest.slug == "contest-test"))
+    flags = {cp.problem.slug: cp.first_blood_announced for cp in contest.problems}
+    assert flags == {problem.slug: True, second.slug: False}
+
+
+def test_update_contest_swaps_labels_without_conflict(client, db, problem):
+    """Permuter deux labels (A↔B) ne doit pas violer la contrainte d'unicité
+    (contest_id, label) : les anciennes lignes partent avant l'insertion."""
+    make_admin(client, db)
+    second = _second_problem(db)
+    now = datetime.now(UTC)
+    contest = Contest(
+        slug="swap-test",
+        title="Swap",
+        start_at=now + timedelta(minutes=10),
+        end_at=now + timedelta(minutes=120),
+        problems=[
+            ContestProblem(problem_id=problem.id, label="A"),
+            ContestProblem(problem_id=second.id, label="B"),
+        ],
+    )
+    db.add(contest)
+    db.commit()
+
+    resp = client.put(
+        "/api/contests/swap-test",
+        json={
+            "slug": "swap-test",
+            "title": "Swap",
+            "start_at": "2026-07-01T18:00:00+00:00",
+            "end_at": "2026-07-01T21:00:00+00:00",
+            "problems": [
+                {"slug": problem.slug, "label": "B"},
+                {"slug": second.slug, "label": "A"},
+            ],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    db.expire_all()
+    contest = db.scalar(select(Contest).where(Contest.slug == "swap-test"))
+    assert {cp.problem.slug: cp.label for cp in contest.problems} == {
+        problem.slug: "B",
+        second.slug: "A",
+    }
+
+
+async def test_first_blood_announced_to_earliest_id_on_tie(
+    client, db, problem, session_factory
+):
+    """À created_at égal, le premier sang revient au plus petit id — exactement le
+    départage du scoreboard (compute_scores trie par (created_at, id)). On annonce
+    donc ce plus petit id, et le ballon du classement désigne la même personne :
+    jamais de divergence, jamais « ni l'un ni l'autre »."""
+    from app.judging import JudgeWorker
+    from tests.conftest import FakeJudge
+
+    alice = register(client)
+    register(client, "bob@example.org")
+    contest = make_contest(db, problem, start_in_min=-30, end_in_min=30)
+    register_to(db, contest, "alice@example.org")
+    bob = register_to(db, contest, "bob@example.org")
+
+    same = datetime.now(UTC)
+    sub_early = Submission(
+        user_id=alice["id"],
+        problem_id=problem.id,
+        contest_id=contest.id,
+        language="python",
+        source_code="x",
+        status=SubmissionStatus.QUEUED,
+    )
+    sub_early.created_at = same
+    db.add(sub_early)
+    db.flush()  # fixe un id avant la seconde insertion
+    sub_late = Submission(
+        user_id=bob.id,
+        problem_id=problem.id,
+        contest_id=contest.id,
+        language="python",
+        source_code="x",
+        status=SubmissionStatus.DONE,
+        verdict=Verdict.ACCEPTED,
+    )
+    sub_late.created_at = same
+    db.add(sub_late)
+    db.commit()
+    assert sub_early.id < sub_late.id
+
+    worker = JudgeWorker(FakeJudge(Verdict.ACCEPTED), session_factory=session_factory)
+    with patch("app.notify.first_blood") as mock_first_blood:
+        await worker._judge_one(sub_early.id)
+        # Un AC de même minute existe déjà (id plus grand) : il ne prive pas le plus
+        # petit id de son premier sang.
+        assert mock_first_blood.call_count == 1
+
+    board = client.get("/api/contests/contest-test/scoreboard").json()
+    by_uid = {r["user_id"]: r for r in board["rows"]}
+    assert by_uid[alice["id"]]["cells"][0]["first_blood"] is True
+    assert by_uid[bob.id]["cells"][0]["first_blood"] is False
+
+
+async def test_first_blood_announced_only_once_on_rejudge(client, db, problem, session_factory):
+    from app.judging import JudgeWorker
+    from tests.conftest import FakeJudge
+
+    user_info = register(client)
+    contest = make_contest(db, problem, start_in_min=-30, end_in_min=30)
+    register_to(db, contest, "alice@example.org")
+
+    s = Submission(
+        user_id=user_info["id"],
+        problem_id=problem.id,
+        contest_id=contest.id,
+        language="python",
+        source_code="x",
+        status=SubmissionStatus.QUEUED,
+        created_at=datetime.now(UTC),
+    )
+    db.add(s)
+    db.commit()
+
+    worker = JudgeWorker(FakeJudge(Verdict.ACCEPTED), session_factory=session_factory)
+
+    with patch("app.notify.first_blood") as mock_first_blood:
+        await worker._judge_one(s.id)
+        assert mock_first_blood.call_count == 1
+
+        db.refresh(s)
+        s.status = SubmissionStatus.QUEUED
+        s.verdict = None
+        db.commit()
+
+        await worker._judge_one(s.id)
+        assert mock_first_blood.call_count == 1
